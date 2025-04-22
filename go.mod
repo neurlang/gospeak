@@ -2,15 +2,13 @@ module localhost/gospeak
 
 go 1.23.4
 
-replace github.com/neurlang/gomel => ../gomel/
-
 replace github.com/neurlang/classifier => ../classifier/
 
 require (
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762
 	github.com/muesli/kmeans v0.3.1
 	github.com/neurlang/classifier v0.1.8
-	github.com/neurlang/gomel v0.0.3
+	github.com/neurlang/gomel v0.0.4
 	github.com/neurlang/kmeans v0.0.0-20250420035214-829a9431884a
 
 )
