@@ -1,5 +1,6 @@
 package main
 
+import "time"
 import "github.com/neurlang/classifier/datasets/speak"
 import "github.com/neurlang/classifier/layer/sum"
 import "github.com/neurlang/classifier/layer/sochastic"
@@ -93,6 +94,8 @@ func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename st
 	m.Resolut = 4096
 	m.GriffinLimIterations = 1
 
+	fmt.Println(centroids)
+
 	var buf [][2]float64
 	for _, centroid := range centroids {
 		var prev float64
@@ -175,7 +178,7 @@ func predict_acoustic_codewords(line string, fanout1 int, bigrams map[string]map
 }
 
 func main() {
-
+	start := time.Now()
 	modeldir := `../../dict/slovak/`
 
 	var file struct {
@@ -223,10 +226,16 @@ func main() {
 	net.NewLayer(1, 0)
 
 	err := net.ReadZlibWeightsFromFile("/home/m/go/src/example.com/repo.git/classifier/cmd/train_speak/output.99.json.t.lzw")
+	// Code to measure
+	duration := time.Since(start)
+
+	// Formatted string, such as "2h3m0.5s" or "4.503μs"
+	fmt.Println(duration)
+
 	if err != nil {
 		panic(err)
 	}
-
+	//centroids_vocode([]uint32{0, 0, 0, 0, 0, 0, 0, 0, 0}, file.Centroids, "000.wav")
 	//centroids_vocode([]uint32{447, 447, 364, 145, 184, 99, 309, 97, 74, 49, 403, 430, 3, 296, 87, 87, 281, 177, 200, 142, 156, 206, 206, 306, 57, 124, 20, 295, 295, 295, 295, 71, 131, 131, 131}, file.Centroids, "amsterdam.wav")
 
 	// Create a new scanner to read the file line by line
@@ -236,6 +245,7 @@ func main() {
 
 		fmt.Println([]rune(line))
 
+		start := time.Now()
 		var centroids = unpack_tokens_into_mels_centroids(predict_acoustic_codewords(line, fanout1, bigrams, net))
 
 		fmt.Println(centroids)
@@ -244,6 +254,17 @@ func main() {
 			continue
 		}
 
-		centroids_vocode(centroids_unpad(centroids_unpad(centroids)), file.Centroids, "test.wav")
+		centroids = centroids_unpad(centroids_unpad(centroids))
+		if len(centroids) == 0 {
+			continue
+		}
+
+		centroids_vocode(centroids, file.Centroids, "test.wav")
+
+		// Code to measure
+		duration := time.Since(start)
+
+		// Formatted string, such as "2h3m0.5s" or "4.503μs"
+		fmt.Println(duration)
 	}
 }
