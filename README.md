@@ -1,5 +1,6 @@
 # gospeak
-A Golang Text to Speech System
+
+A Low-End Golang Text to Speech System
 
 ## Features
 
