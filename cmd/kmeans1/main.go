@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/muesli/clusters"
-	"github.com/muesli/kmeans/plotter"
 	"github.com/neurlang/classifier/parallel"
 	"github.com/neurlang/gomel/mel"
 	"github.com/neurlang/kmeans"
@@ -153,7 +152,7 @@ func main() {
 	ShuffleSlice(dataset)
 
 	// 3. Run K-means clustering
-	km, err := kmeans.NewWithOptions(0.05, plotter.SimplePlotter{})
+	km, err := kmeans.NewWithOptions(0.05, nil)
 	km.Threads = 1000
 	if err != nil {
 		panic(err)
