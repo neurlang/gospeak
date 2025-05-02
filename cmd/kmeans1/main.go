@@ -6,16 +6,17 @@ import (
 	"fmt"
 	"github.com/muesli/clusters"
 	"github.com/neurlang/classifier/parallel"
-	"github.com/neurlang/gomel/mel"
+	"github.com/neurlang/gomel/phase"
 	"github.com/neurlang/kmeans"
 	"io/fs"
 	"io/ioutil"
-	"math"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	//"math/cmplx"
+	"math"
 )
 
 import (
@@ -45,6 +46,15 @@ func progressbar(pos, max uint64) {
 	}
 }
 
+// Remove low-energy frames (silence) before clustering
+func isSilence(frame []float64, logEnergyThreshold float64) bool {
+	energy := 0.0
+	for i := range frame {
+		energy += frame[i] * frame[i] // Sum squared magnitudes
+	}
+	return energy < logEnergyThreshold
+}
+
 // ShuffleSlice shuffles the slice.
 func ShuffleSlice[T any](slice []T) {
 	for i := len(slice) - 1; i >= 0; i-- {
@@ -53,49 +63,29 @@ func ShuffleSlice[T any](slice []T) {
 	}
 }
 
-// Remove low-energy frames (silence) before clustering
-func isSilence(frame []float64, logEnergyThreshold float64) bool {
-	energy := 0.0
-	for i := range frame {
-		energy += frame[i] * frame[i] // Sum squared magnitudes
-	}
-	logEnergy := math.Log(energy + 1e-10) // Avoid log(0)
-	return logEnergy < logEnergyThreshold
+type plotter struct {
+	now uint64
+	tot uint64
 }
 
-// L2-normalize each mel frame before clustering
-func normalize(frame []float64) []float64 {
-	mean, stddev := 0.0, 0.0
-	for i := range frame {
-		mean += frame[i]
-	}
-	mean /= float64(len(frame)) // 192 bins × 2 components
-	for i := range frame {
-		stddev += (frame[i] - mean) * (frame[i] - mean)
-	}
-	stddev = math.Sqrt(stddev / float64(len(frame)))
-	if stddev < 1e-10 {
-		return frame
-	}
-	for i := range frame {
-		frame[i] = (frame[i] - mean) / stddev
-	}
-	return frame
+func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
+	progressbar(uint64(iteration+1)+p.now, p.tot)
+	return nil
 }
 
 func main() {
+	const chunks = 64
+	const limit = 9999999999999999
+	const kmeanz = 4096 // 32767
+	const masterkmeanz = 32767
+	const freqs = 384 * 2
 
-	const limit = 99999999
-	const kmeanz = 512
-
-	// 1. Load FLAC file and convert to mel spectrogram
-	m := mel.NewMel()
-	m.MelFmin = 0
-	m.MelFmax = 16000
+	// 1. Load FLAC file and convert to phase spectrogram
+	m := phase.NewPhase()
 	m.YReverse = true
-	m.Window = 1280
-	m.NumMels = 192
-	m.Resolut = 4096
+	m.Window = 640 * 2
+	m.NumFreqs = freqs
+	m.Resolut = 2048 * 2
 
 	var files []string
 	modeldir := `../../dict/slovak/`
@@ -109,56 +99,127 @@ func main() {
 		}
 		return nil
 	})
-	// 2. Prepare dataset for K-means
-	var dataset clusters.Observations
-	var dataset_mut sync.Mutex
-	var dataset_progress atomic.Uint64
-	var dataset_discarded atomic.Uint64
 
-	parallel.ForEach(len(files), 1000, func(i int) {
+	// dataset for master problem
+	var master clusters.Observations
 
-		// Load audio samples
-		audioSamples := mel.LoadFlac(files[i])
+	for chunk := 0; chunk < chunks; chunk++ {
 
-		// Convert to mel spectrogram (returns [][2]float64 where each element is [192]float64 for sine and cosine)
-		melFrames, err := m.ToMel(audioSamples)
+		// 2. Prepare dataset for K-means
+		var dataset clusters.Observations
+		var dataset_mut sync.Mutex
+		var dataset_progress atomic.Uint64
+		//var dataset_discarded atomic.Uint64
+		var dataset_total atomic.Uint64
+
+		parallel.ForEach(len(files), 1000, func(i int) {
+
+			if i%chunks != chunk {
+				return
+			}
+
+			// Load audio samples
+			audioSamples := phase.LoadFlac(files[i])
+
+			// Convert to mel spectrogram (returns [][3]float64 where each element is [freqs]float64 for sine and cosine and real)
+			melFrames, err := m.ToPhase(audioSamples)
+			if err != nil {
+				panic(err)
+			}
+
+			//var discarded uint64
+			for j := 0; j < len(melFrames); j += freqs {
+				// Convert [freqs][3]float64 to a flat []float64 (1152 dimensions)
+				/*
+					var coords []float64
+					for i := 0; i < freqs; i++ {
+						coords = append(coords, melFrames[j+i][0]) // first component
+						coords = append(coords, melFrames[j+i][1]) // second component
+						coords = append(coords, melFrames[j+i][2]) // third component
+					}
+				*/
+				var keycoords []float64
+				for i := 0; i < freqs; i++ {
+					//keycoords = append(keycoords, math.Log(math.Pow(melFrames[j+i][0], 2) + math.Pow(melFrames[j+i][1], 2)))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][1]), 2) + math.Pow(math.Exp(melFrames[j+i][2]), 2))))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]), 2) + math.Pow(math.Exp(melFrames[j+i][1]), 2))))
+					//keycoords = append(keycoords, math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]),2)+math.Pow(math.Exp(melFrames[j+i][2]),2)))
+					//keycoords = append(keycoords, math.Log(math.Exp(melFrames[j+i][0]) + math.Exp(melFrames[j+i][2])))
+
+					/*
+						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][1]))))
+						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][1]), math.Exp(melFrames[j+i][2]))))
+						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][2]))))
+					*/
+				}
+				//coords = normalize(coords)
+				/*
+					if isSilence(keycoords, 100) {
+						discarded++
+						continue
+					}
+				*/
+				var coords = clusters.Coordinates(keycoords)
+				dataset_mut.Lock()
+				dataset = append(dataset, coords)
+				dataset_mut.Unlock()
+			}
+			//dataset_discarded.Add(discarded)
+			dataset_total.Add(uint64(len(melFrames)) / freqs)
+			dataset_progress.Add(uint64(chunks))
+			progressbar(dataset_progress.Load(), uint64(len(files)))
+			//println(discarded)
+		})
+
+		fmt.Println()
+
+		//println("Silence discarded: ", dataset_discarded.Load() * 100 / dataset_total.Load() , "%")
+
+		ShuffleSlice(dataset)
+
+		progressbar(uint64(chunk), uint64(chunks))
+
+		plotter := &plotter{now: uint64(chunk) * 3, tot: uint64(chunks) * 3}
+		/*
+			for i := 0; i < 3; i++ {
+				plotter.Plot(nil, i)
+				time.Sleep(time.Second)
+			}
+		*/
+
+		// 3. Run K-means clustering
+		km, err := kmeans.NewWithOptions(0.05, plotter)
+		km.Threads = 1000
 		if err != nil {
 			panic(err)
 		}
 
-		var discarded uint64
-		for j := 0; j < len(melFrames); j += 192 {
-			// Convert [192][2]float64 to a flat []float64 (384 dimensions)
-			var coords []float64
-			for i := 0; i < 192; i++ {
-				coords = append(coords, melFrames[j+i][0]) // sine component
-				coords = append(coords, melFrames[j+i][1]) // cosine component
-			}
-			//coords = normalize(coords)
-			if isSilence(coords, 8) {
-				discarded++
-				continue
-			}
-			dataset_mut.Lock()
-			dataset = append(dataset, clusters.Coordinates(coords))
-			dataset_mut.Unlock()
+		clu, err := km.Partition(dataset, kmeanz)
+		if err != nil {
+			panic(err)
 		}
-		dataset_discarded.Add(discarded)
-		dataset_progress.Add(1)
-		progressbar(dataset_progress.Load(), uint64(len(files)))
-		//println(discarded)
-	})
 
-	ShuffleSlice(dataset)
+		sort.Slice(clu, func(i, j int) bool {
+			return len(clu[i].Observations) > len(clu[j].Observations)
+		})
 
-	// 3. Run K-means clustering
-	km, err := kmeans.NewWithOptions(0.05, nil)
+		for _, c := range clu {
+			master = append(master, c.Center)
+		}
+	}
+
+	fmt.Println()
+	progressbar(0, 1)
+
+	plotter := &plotter{now: 0, tot: 10}
+
+	// 4. Run master K-means clustering
+	km, err := kmeans.NewWithOptions(0.05, plotter)
 	km.Threads = 1000
 	if err != nil {
 		panic(err)
 	}
-
-	clu, err := km.Partition(dataset, kmeanz)
+	clu, err := km.Partition(master, masterkmeanz)
 	if err != nil {
 		panic(err)
 	}
@@ -167,18 +228,69 @@ func main() {
 		return len(clu[i].Observations) > len(clu[j].Observations)
 	})
 
+	var fileMutex sync.Mutex
 	var file struct {
+		minDists  []float64
 		Centroids [][]LPFloat
 	}
-
-	// 4. Print cluster info
-	for i, c := range clu {
+	// 5. Init cluster info
+	for range clu {
 		//fmt.Printf("Cluster %d - Centroid (%d dimensions) - frames: %d\n", i, len(c.Center), len(c.Observations))
 		file.Centroids = append(file.Centroids, []LPFloat{})
-		for _, p := range c.Center {
-			file.Centroids[i] = append(file.Centroids[i], LPFloat{Value: p, Digits: 5})
-		}
+		file.minDists = append(file.minDists, math.MaxFloat64)
 	}
+
+	// 6. convert wavs to codewords
+
+	parallel.ForEach(len(files), 1000, func(i int) {
+
+		// Load audio samples
+		audioSamples := phase.LoadFlac(files[i])
+
+		// Convert to mel spectrogram (returns [][3]float64 where each element is [freqs]float64 for sine and cosine and real)
+		melFrames, err := m.ToPhase(audioSamples)
+		if err != nil {
+			panic(err)
+		}
+
+		var vec []uint32
+
+		for j := 0; j < len(melFrames); j += freqs {
+			// Convert [freqs][3]float64 to a flat []float64 (1152 dimensions)
+			var coords []LPFloat
+			for i := 0; i < freqs; i++ {
+				coords = append(coords, LPFloat{Value: melFrames[j+i][0], Digits: 3}) // first component
+				coords = append(coords, LPFloat{Value: melFrames[j+i][1], Digits: 3}) // second component
+				coords = append(coords, LPFloat{Value: melFrames[j+i][2], Digits: 3}) // third component
+			}
+			var keycoords []float64
+			for i := 0; i < freqs; i++ {
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][1]), 2) + math.Pow(math.Exp(melFrames[j+i][2]), 2))))
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]), 2) + math.Pow(math.Exp(melFrames[j+i][1]), 2))))
+				//keycoords = append(keycoords, math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]),2)+math.Pow(math.Exp(melFrames[j+i][2]),2)))
+				//keycoords = append(keycoords, math.Log(math.Exp(melFrames[j+i][0]) + math.Exp(melFrames[j+i][2])))
+				/*
+					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][1]))))
+					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][1]), math.Exp(melFrames[j+i][2]))))
+					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][2]))))
+				*/
+			}
+			var sample = clusters.Coordinates(keycoords)
+			codeword := clu.Nearest(sample)
+			dist := sample.Distance(clu[codeword].Center)
+			vec = append(vec, uint32(codeword))
+
+			fileMutex.Lock()
+			// update solution's nearest Centroids
+			if dist < file.minDists[codeword] {
+				file.minDists[codeword] = dist
+				file.Centroids[codeword] = coords
+			}
+			fileMutex.Unlock()
+		}
+		fmt.Println(files[i], vec)
+	})
+	// Output to file
 	{
 		data, err := json.Marshal(file)
 		if err != nil {
@@ -191,32 +303,5 @@ func main() {
 		}
 		fmt.Printf("Total clusters: %d\n", len(clu))
 	}
-	// 5. convert wavs to codewords
 
-	parallel.ForEach(len(files), 1000, func(i int) {
-
-		// Load audio samples
-		audioSamples := mel.LoadFlac(files[i])
-
-		// Convert to mel spectrogram (returns [][2]float64 where each element is [192]float64 for sine and cosine)
-		melFrames, err := m.ToMel(audioSamples)
-		if err != nil {
-			panic(err)
-		}
-
-		var vec []uint32
-
-		for j := 0; j < len(melFrames); j += 192 {
-			// Convert [192][2]float64 to a flat []float64 (384 dimensions)
-			var coords []float64
-			for i := 0; i < 192; i++ {
-				coords = append(coords, melFrames[j+i][0]) // sine component
-				coords = append(coords, melFrames[j+i][1]) // cosine component
-			}
-			var sample = clusters.Coordinates(coords)
-			codeword := clu.Nearest(sample)
-			vec = append(vec, uint32(codeword))
-		}
-		fmt.Println(files[i], vec)
-	})
 }

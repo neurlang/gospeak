@@ -10,69 +10,32 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/neurlang/gomel/mel"
+	"github.com/neurlang/gomel/phase"
 	"io/ioutil"
 	"os"
 	"strconv"
 )
-import (
-	rand "math/rand/v2"
-)
 
-func bigram_gen_next(bigrams map[string]map[string]int, current string, used map[int]struct{}) int {
+func bigram_gen_next(bigrams map[string]map[string]int, current string) (out []uint32) {
 	// Check if current number exists in the model
 	nextOptions, exists := bigrams[current]
 	if !exists {
-		//fmt.Printf("No data for number '%s' in the bigram model\n", current)
-		return -1
+		fmt.Printf("No data for number '%s' in the bigram model\n", current)
+		return nil
 	}
 
-	// Calculate total occurrences
-	total := 0
-	for num, count := range nextOptions {
+	// Load all next possibilities
+	for num := range nextOptions {
 		n, _ := strconv.Atoi(num)
-		if _, ok := used[int(n)]; ok {
-			continue
-		}
-		total += count
+		out = append(out, uint32(n))
 	}
 
-	if total == 0 {
-		return -1
-	}
-
-	// Prepare for probabilistic selection
-	randomValue := rand.IntN(total)
-
-	// Select the next number based on probability
-	cumulative := 0
-	var selected string
-	for num, count := range nextOptions {
-		n, _ := strconv.Atoi(num)
-		if _, ok := used[int(n)]; ok {
-			continue
-		}
-		cumulative += count
-		if randomValue < cumulative {
-			selected = num
-			break
-		}
-	}
-
-	//fmt.Printf("Current number: %s\n", current)
-	//fmt.Printf("Possible next numbers and their probabilities:\n")
-	//for num, count := range nextOptions {
-	//	probability := float64(count) / float64(total) * 100
-	//	fmt.Printf("- %s: %.2f%%\n", num, probability)
-	//}
-	//fmt.Printf("\nSelected next number: %s\n", selected)
-	n, _ := strconv.Atoi(selected)
-	return int(n)
+	return
 }
 func unpack_tokens_into_mels_centroids(n []uint32) (ret []uint32) {
-	const mask = ((1 << 10) - 1)
+	const mask = ((1 << 15) - 1)
 	for _, num := range n {
-		ret = append(ret, ((num >> 20) & mask), ((num >> 10) & mask), ((num >> 0) & mask))
+		ret = append(ret, ((num >> 15) & mask), ((num >> 0) & mask))
 	}
 	return
 }
@@ -81,89 +44,97 @@ func centroids_unpad(centroids []uint32) []uint32 {
 	if len(centroids) > 0 && centroids[len(centroids)-1] == 0 {
 		centroids = centroids[:len(centroids)-1]
 	}
+	if len(centroids) > 0 && centroids[len(centroids)-1] == 0 {
+		centroids = centroids[:len(centroids)-1]
+	}
+	for i := range centroids {
+		centroids[i]--
+	}
 	return centroids
 }
 
 func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename string) {
-	m := mel.NewMel()
-	m.MelFmin = 0
-	m.MelFmax = 16000
+	m := phase.NewPhase()
 	m.YReverse = true
-	m.Window = 1280
-	m.NumMels = 192
-	m.Resolut = 4096
-	m.GriffinLimIterations = 1
+	m.Window = 640 * 2
+	m.NumFreqs = 384 * 2
+	m.Resolut = 2048 * 2
 
 	fmt.Println(centroids)
 
-	var buf [][2]float64
+	var buf [][3]float64
 	for _, centroid := range centroids {
-		var prev float64
+		var prev0, prev1 float64
 		for i, float := range all_centroids[centroid] {
-			if i&1 == 0 {
-				prev = float
+			if i%3 == 0 {
+				prev0 = float
+			} else if i%3 == 1 {
+				prev1 = float
 			} else {
-				buf = append(buf, [2]float64{prev, float})
+				buf = append(buf, [3]float64{prev0, prev1, float})
 			}
 		}
 	}
 
 	//fmt.Println(buf)
 
-	speech, err := m.FromMel(buf)
+	speech, err := m.FromPhase(buf)
 	if err != nil {
 		panic(err)
 	}
-	mel.SaveWav(filename, speech, 48000)
+	phase.SaveWav(filename, speech, 48000)
 }
 
 func predict_acoustic_codewords(line string, fanout1 int, bigrams map[string]map[string]int, net feedforward.FeedforwardNetwork) (ret []uint32) {
-	var sample speak.Sample
+	var sample speak.Sample2
 	sample.Source = []rune(line)
 	sample.Target = []uint32{0}
 	sample.Dim = fanout1
-	var used = make(map[int]struct{})
-	for i := 0; i < 1024; i++ {
-		var next int
+	for i := 0; i < 1; i++ {
+		var nexts []uint32
+		var higerst uint32
 		if len(sample.Target) > 1 {
-			next = bigram_gen_next(bigrams, fmt.Sprint(sample.Target[len(sample.Target)-2]), used)
+			nexts = bigram_gen_next(bigrams, fmt.Sprint(sample.Target[len(sample.Target)-2]))
 		} else {
-			next = bigram_gen_next(bigrams, string(sample.Source[0]), used)
+			nexts = bigram_gen_next(bigrams, string(sample.Source[0]))
 		}
-		if next == -1 {
-			continue
-		}
-		if _, was_used := used[next]; was_used {
-			continue
-		}
-		const mask = ((1 << 10) - 1)
-		println("testing", ((next >> 20) & mask), ((next >> 10) & mask), ((next >> 0) & mask))
+		if len(nexts) == 0 {
+			println("no next, ending")
+			return
+		} else if len(nexts) == 1 {
+			higerst = nexts[0]
+		} else {
 
-		sample.SetOutput(uint32(next))
-		sample.Target[len(sample.Target)-1] = uint32(next)
-		var io = &sample
-		//fmt.Println(io)
+			for _, next := range nexts {
 
-		var predicted = net.Infer2(io) & 1
-		if predicted == 1 {
+				const mask = ((1 << 15) - 1)
+				println("testing", ((next>>15)&mask)-1, ((next>>0)&mask)-1)
 
-			println("predicted == 1")
+				sample.SetOutput(uint32(next))
+				sample.Target[len(sample.Target)-1] = uint32(next)
+				var io = &sample
+				//fmt.Println(io)
 
-			i = -1
-			if len(ret) < len(sample.Target) {
-				ret = sample.Target
+				var predicted = net.Infer2(io) & 1
+				if predicted == 1 {
+					println("predicted == 1")
+					if next > higerst {
+						higerst = next
+					}
+				}
 			}
-			sample.Target = append(sample.Target, 0)
-			used = make(map[int]struct{})
-			fmt.Println(sample.Target)
-
-			continue
-		} else {
-			println("predicted == 0")
-			used[next] = struct{}{}
-			continue
 		}
-		if len(sample.Target) > 2*len(sample.Source) {
+
+		sample.Target[len(sample.Target)-1] = higerst
+
+		i = -1
+		if len(ret) < len(sample.Target) {
+			ret = sample.Target
+		}
+		sample.Target = append(sample.Target, 0)
+		fmt.Println(sample.Target)
+
+		if len(sample.Target) > 6*len(sample.Source) {
 			println("target sequence is long, breaking")
 			break
 		}
@@ -225,23 +196,29 @@ func main() {
 	net.NewCombiner(sum.MustNew([]uint{fanout1 * fanout2}, 0))
 	net.NewLayer(1, 0)
 
-	err := net.ReadZlibWeightsFromFile("/home/m/go/src/example.com/repo.git/classifier/cmd/train_speak/output.99.json.t.lzw")
+	err := net.ReadZlibWeightsFromFile(modeldir + `output.99.json.t.lzw`)
+	if err != nil {
+		panic(err)
+	}
 	// Code to measure
 	duration := time.Since(start)
 
 	// Formatted string, such as "2h3m0.5s" or "4.503μs"
 	fmt.Println(duration)
 
-	if err != nil {
-		panic(err)
-	}
 	//centroids_vocode([]uint32{0, 0, 0, 0, 0, 0, 0, 0, 0}, file.Centroids, "000.wav")
-	//centroids_vocode([]uint32{447, 447, 364, 145, 184, 99, 309, 97, 74, 49, 403, 430, 3, 296, 87, 87, 281, 177, 200, 142, 156, 206, 206, 306, 57, 124, 20, 295, 295, 295, 295, 71, 131, 131, 131}, file.Centroids, "amsterdam.wav")
+	centroids_vocode([]uint32{
+		5870, 17390, 5089, 2148, 7879, 16094, 2754, 8719, 11767, 2723, 10786, 3223, 2593, 1248, 363, 63, 47, 15849, 14221, 31292},
+		file.Centroids, "robot.wav")
 
 	// Create a new scanner to read the file line by line
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		if len(line) == 0 {
+			continue
+		}
 
 		fmt.Println([]rune(line))
 
@@ -254,7 +231,7 @@ func main() {
 			continue
 		}
 
-		centroids = centroids_unpad(centroids_unpad(centroids))
+		centroids = centroids_unpad(centroids)
 		if len(centroids) == 0 {
 			continue
 		}

@@ -10,11 +10,11 @@ import (
 )
 
 func compress_numbers_into_tokens(n []string) (ret []string) {
-	var dst_uints = make([]uint32, (len(n)+2)/3, (len(n)+2)/3)
+	var dst_uints = make([]uint32, (len(n)+1)/2, (len(n)+1)/2)
 	for i, tok := range n {
 		n, _ := strconv.Atoi(tok)
-		shift := (2 - (i % 3)) * 10 // Reverse the shift direction
-		dst_uints[i/3] |= uint32(n) << shift
+		shift := (1 - (i % 2)) * 15 // Reverse the shift direction
+		dst_uints[i/2] |= uint32(n+1) << shift
 	}
 	for _, r := range dst_uints {
 		ret = append(ret, fmt.Sprint(r))
