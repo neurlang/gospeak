@@ -79,9 +79,9 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 			p.cur = uint64(-iteration)
 		}
 
-		target := (int64(len(cc)) / int64(1/p.del))
-		// Calculate percentage (integer math)
-		percent := 96 - ( (int64(p.cur)-target) * 96 / (int64(p.pro)-target) )
+		target := (65536*int64(len(cc)) * int64(65536*p.del))
+		// Calculate percentage (integer math) - now float64 log2 progress
+		percent := 100 - int64( math.Log2(1+float64(int64(p.cur)-target)) * 100 / math.Log2(1+float64(int64(p.pro)-target)))
 		if percent < 0 {
 			percent = 0
 		}
