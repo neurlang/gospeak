@@ -204,6 +204,8 @@ func main() {
 		}
 	}
 
+	ShuffleSlice(master)
+
 	fmt.Println()
 	progressbar(0, 1)
 
