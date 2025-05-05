@@ -55,12 +55,12 @@ func isSilence(frame []float64, logEnergyThreshold float64) bool {
 	return energy < logEnergyThreshold
 }
 
-// ShuffleSlice shuffles the slice.
+// ShuffleSlice shuffles the slice. Now copied straight from the manual.
+// Note: Tested that the randomness source is not deterministic (different shufflings across program runs).
 func ShuffleSlice[T any](slice []T) {
-	for i := len(slice) - 1; i >= 0; i-- {
-		j := rand.IntN(i + 1)
+	rand.Shuffle(len(slice), func(i, j int) {
 		slice[i], slice[j] = slice[j], slice[i]
-	}
+	})
 }
 
 type plotter struct {
