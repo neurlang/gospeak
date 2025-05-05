@@ -64,12 +64,35 @@ func ShuffleSlice[T any](slice []T) {
 }
 
 type plotter struct {
-	now uint64
-	tot uint64
+	del float64
+	itr uint64
+	pro uint64
+	cur uint64
 }
 
 func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
-	progressbar(uint64(iteration+1)+p.now, p.tot)
+	if iteration < 0 && p.del != 0 {
+		if p.itr == 0 {
+			p.pro = uint64(-iteration)
+			p.cur = uint64(-iteration)
+		} else {
+			p.cur = uint64(-iteration)
+		}
+
+		target := (int64(len(cc)) / int64(1/p.del))
+		// Calculate percentage (integer math)
+		percent := 96 - ( (int64(p.cur)-target) * 96 / (int64(p.pro)-target) )
+		if percent < 0 {
+			percent = 0
+		}
+		if percent < int64(p.itr) {
+			percent = int64(p.itr)
+		}
+		progressbar(uint64(percent), 96)
+	} else {
+		progressbar(p.itr, 96)
+	}
+	p.itr++
 	return nil
 }
 
@@ -177,15 +200,9 @@ func main() {
 
 		ShuffleSlice(dataset)
 
-		progressbar(uint64(chunk), uint64(chunks))
+		progressbar(0, 1)
 
-		plotter := &plotter{now: uint64(chunk) * 3, tot: uint64(chunks) * 3}
-		/*
-			for i := 0; i < 3; i++ {
-				plotter.Plot(nil, i)
-				time.Sleep(time.Second)
-			}
-		*/
+		plotter := &plotter{del: 0.05}
 
 		// 3. Run K-means clustering
 		km, err := kmeans.NewWithOptions(0.05, plotter)
@@ -209,7 +226,7 @@ func main() {
 	fmt.Println()
 	progressbar(0, 1)
 
-	plotter := &plotter{now: 0, tot: 10}
+	plotter := &plotter{del: 0.05}
 
 	// 4. Run master K-means clustering
 	km, err := kmeans.NewWithOptions(0.05, plotter)
