@@ -199,10 +199,6 @@ func main() {
 			panic(err)
 		}
 
-		sort.Slice(clu, func(i, j int) bool {
-			return len(clu[i].Observations) > len(clu[j].Observations)
-		})
-
 		for _, c := range clu {
 			master = append(master, c.Center)
 		}
