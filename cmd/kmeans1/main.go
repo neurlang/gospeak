@@ -65,6 +65,7 @@ func ShuffleSlice[T any](slice []T) {
 
 type plotter struct {
 	del float64
+	bas float64
 	itr uint64
 	pro uint64
 	cur uint64
@@ -75,13 +76,19 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 		if p.itr == 0 {
 			p.pro = uint64(-iteration)
 			p.cur = uint64(-iteration)
+			p.bas = 2
+		} else if p.itr == 1 {
+			p.cur = uint64(-iteration)
+			if p.cur != 0 {
+				p.bas = float64(p.pro) / float64(p.cur)
+			}
 		} else {
 			p.cur = uint64(-iteration)
 		}
 
-		target := (65536 * int64(len(cc)) * int64(65536*p.del))
+		target := (int64(len(cc)) * int64(65536*p.del) / 65536)
 		// Calculate percentage (integer math) - now float64 log2 progress
-		percent := 100 - int64(math.Log2(1+float64(int64(p.cur)-target))*100/math.Log2(1+float64(int64(p.pro)-target)))
+		percent := 96 - int64(p.bas*math.Log2(1+float64(int64(p.cur)-target))*96/(p.bas*math.Log2(1+float64(int64(p.pro)-target))))
 		if percent < 0 {
 			percent = 0
 		}
