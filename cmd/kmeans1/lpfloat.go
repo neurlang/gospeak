@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "sync/atomic"
+import "math"
 
 type LPFloat struct {
 	Value  float64 // the actual value
@@ -19,7 +20,7 @@ func verifyFloat(value float64) float64 {
 	if badFloatDetected.Load() {
 		return value
 	}
-	badFloatDetected.Set(true)
+	badFloatDetected.Store(true)
 	if math.IsNaN(value) {
 		println("\nbadFloatDetected: NaN")
 	}
