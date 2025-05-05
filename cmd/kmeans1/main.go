@@ -79,9 +79,9 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 			p.cur = uint64(-iteration)
 		}
 
-		target := (65536*int64(len(cc)) * int64(65536*p.del))
+		target := (65536 * int64(len(cc)) * int64(65536*p.del))
 		// Calculate percentage (integer math) - now float64 log2 progress
-		percent := 100 - int64( math.Log2(1+float64(int64(p.cur)-target)) * 100 / math.Log2(1+float64(int64(p.pro)-target)))
+		percent := 100 - int64(math.Log2(1+float64(int64(p.cur)-target))*100/math.Log2(1+float64(int64(p.pro)-target)))
 		if percent < 0 {
 			percent = 0
 		}
@@ -152,36 +152,12 @@ func main() {
 
 			//var discarded uint64
 			for j := 0; j < len(melFrames); j += freqs {
-				// Convert [freqs][3]float64 to a flat []float64 (1152 dimensions)
-				/*
-					var coords []float64
-					for i := 0; i < freqs; i++ {
-						coords = append(coords, melFrames[j+i][0]) // first component
-						coords = append(coords, melFrames[j+i][1]) // second component
-						coords = append(coords, melFrames[j+i][2]) // third component
-					}
-				*/
 				var keycoords []float64
 				for i := 0; i < freqs; i++ {
-					//keycoords = append(keycoords, math.Log(math.Pow(melFrames[j+i][0], 2) + math.Pow(melFrames[j+i][1], 2)))
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][1]), 2) + math.Pow(math.Exp(melFrames[j+i][2]), 2))))
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]), 2) + math.Pow(math.Exp(melFrames[j+i][1]), 2))))
-					//keycoords = append(keycoords, math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]),2)+math.Pow(math.Exp(melFrames[j+i][2]),2)))
-					//keycoords = append(keycoords, math.Log(math.Exp(melFrames[j+i][0]) + math.Exp(melFrames[j+i][2])))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][1]), 2)) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][2])), 2))))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][0]), 2)) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2))))
 
-					/*
-						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][1]))))
-						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][1]), math.Exp(melFrames[j+i][2]))))
-						keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][2]))))
-					*/
 				}
-				//coords = normalize(coords)
-				/*
-					if isSilence(keycoords, 100) {
-						discarded++
-						continue
-					}
-				*/
 				var coords = clusters.Coordinates(keycoords)
 				dataset_mut.Lock()
 				dataset = append(dataset, coords)
@@ -280,15 +256,8 @@ func main() {
 			}
 			var keycoords []float64
 			for i := 0; i < freqs; i++ {
-				keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][1]), 2) + math.Pow(math.Exp(melFrames[j+i][2]), 2))))
-				keycoords = append(keycoords, (math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]), 2) + math.Pow(math.Exp(melFrames[j+i][1]), 2))))
-				//keycoords = append(keycoords, math.Sqrt(math.Pow(math.Exp(melFrames[j+i][0]),2)+math.Pow(math.Exp(melFrames[j+i][2]),2)))
-				//keycoords = append(keycoords, math.Log(math.Exp(melFrames[j+i][0]) + math.Exp(melFrames[j+i][2])))
-				/*
-					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][1]))))
-					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][1]), math.Exp(melFrames[j+i][2]))))
-					keycoords = append(keycoords, cmplx.Abs(complex(math.Exp(melFrames[j+i][0]), math.Exp(melFrames[j+i][2]))))
-				*/
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][1]), 2)) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][2])), 2))))
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][0]), 2)) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2))))
 			}
 			var sample = clusters.Coordinates(keycoords)
 			codeword := clu.Nearest(sample)
