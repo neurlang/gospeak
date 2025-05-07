@@ -25,6 +25,7 @@ import (
 import (
 	"flag"
 	"os"
+	"os/exec"
 )
 
 func emptySpace(space int) string {
@@ -164,6 +165,7 @@ func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 func main() {
 	srcDir := flag.String("srcdir", "", "path to directory containing wav or flac files to generate codec for")
 	dstDir := flag.String("dstdir", "", "path to directory to write generated codec to")
+	execute := flag.String("execute", "", "a command to run after each phase gets solved")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -318,7 +320,12 @@ func main() {
 		for _, c := range clu {
 			master = append(master, c.Center)
 		}
-
+		if execute != nil && *execute != "" {
+			var execVect = strings.Fields(*execute)
+			if len(execVect) != 0 {
+				exec.Command(execVect[0], execVect[1:]...).Start()
+			}
+		}
 	}
 
 	ShuffleSlice(master)
