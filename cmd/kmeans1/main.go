@@ -103,19 +103,33 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 	return nil
 }
 
+func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
+	if zerosCount == 0 {
+		return audio
+	}
+	result = make([]float64, 0, len(audio)*(zerosCount+1))
+	for _, v := range audio {
+		result = append(result, v)
+		for i := 1; i < zerosCount; i++ {
+			result = append(result, 0)
+		}
+	}
+	return
+}
+
 func main() {
 	const chunks = 64
 	const limit = 9999999999999999
 	const kmeanz = 4096 // 32767
 	const masterkmeanz = 32767
-	const freqs = 384 * 2
 
 	// 1. Load FLAC file and convert to phase spectrogram
 	m := phase.NewPhase()
 	m.YReverse = true
 	m.Window = 640 * 2
-	m.NumFreqs = freqs
+	m.NumFreqs = 0 // unknown
 	m.Resolut = 2048 * 2
+	var zerosToStuff = 0
 
 	var files []string
 	modeldir := `../../dict/slovak/`
@@ -125,10 +139,41 @@ func main() {
 			return nil
 		}
 		if len(files) < limit {
+			if m.NumFreqs == 0 {
+				audio, sr, err := phase.LoadFlacSampleRate(path)
+				if err != nil {
+					fmt.Println(err.Error())
+					return nil
+				}
+				if len(audio) == 0 || sr == 0 {
+					return nil
+				}
+				println("Sample rate:", sr)
+				switch sr {
+				case 8000, 16000, 48000:
+					m.NumFreqs = 384 * 2
+				case 11025, 22050, 44100:
+					m.NumFreqs = 418 * 2
+				}
+				switch sr {
+				case 8000:
+					zerosToStuff = 5
+				case 11025:
+					zerosToStuff = 3
+				case 16000:
+					zerosToStuff = 2
+				case 22050:
+					zerosToStuff = 1
+				}
+			}
 			files = append(files, path)
 		}
 		return nil
 	})
+
+	if m.NumFreqs == 0 {
+		panic("couldn't figure out project sample rate - no relevant files found?")
+	}
 
 	// dataset for master problem
 	var master clusters.Observations
@@ -149,18 +194,18 @@ func main() {
 			}
 
 			// Load audio samples
-			audioSamples := phase.LoadFlac(files[i])
+			audioSamples := zeroStuffing(phase.LoadFlac(files[i]), zerosToStuff)
 
-			// Convert to mel spectrogram (returns [][3]float64 where each element is [freqs]float64 for sine and cosine and real)
+			// Convert to mel spectrogram (returns [][3]float64 where each element is [m.NumFreqs]float64 for sine and cosine and real)
 			melFrames, err := m.ToPhase(audioSamples)
 			if err != nil {
 				panic(err)
 			}
 
 			//var discarded uint64
-			for j := 0; j < len(melFrames); j += freqs {
+			for j := 0; j < len(melFrames); j += m.NumFreqs {
 				var keycoords []float64
-				for i := 0; i < freqs; i++ {
+				for i := 0; i < m.NumFreqs; i++ {
 					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
 					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
 
@@ -171,7 +216,7 @@ func main() {
 				dataset_mut.Unlock()
 			}
 			//dataset_discarded.Add(discarded)
-			dataset_total.Add(uint64(len(melFrames)) / freqs)
+			dataset_total.Add(uint64(len(melFrames)) / uint64(m.NumFreqs))
 			dataset_progress.Add(uint64(chunks))
 			progressbar(dataset_progress.Load(), uint64(len(files)))
 			//println(discarded)
@@ -243,9 +288,9 @@ func main() {
 	parallel.ForEach(len(files), 1000, func(i int) {
 
 		// Load audio samples
-		audioSamples := phase.LoadFlac(files[i])
+		audioSamples := zeroStuffing(phase.LoadFlac(files[i]), zerosToStuff)
 
-		// Convert to mel spectrogram (returns [][3]float64 where each element is [freqs]float64 for sine and cosine and real)
+		// Convert to mel spectrogram (returns [][3]float64 where each element is [m.NumFreqs]float64 for sine and cosine and real)
 		melFrames, err := m.ToPhase(audioSamples)
 		if err != nil {
 			panic(err)
@@ -253,16 +298,16 @@ func main() {
 
 		var vec []uint32
 
-		for j := 0; j < len(melFrames); j += freqs {
-			// Convert [freqs][3]float64 to a flat []float64 (1152 dimensions)
+		for j := 0; j < len(melFrames); j += m.NumFreqs {
+			// Convert [m.NumFreqs][3]float64 to a flat []float64 (1152 dimensions)
 			var coords []LPFloat
-			for i := 0; i < freqs; i++ {
+			for i := 0; i < m.NumFreqs; i++ {
 				coords = append(coords, LPFloat{Value: melFrames[j+i][0], Digits: 3}) // first component
 				coords = append(coords, LPFloat{Value: melFrames[j+i][1], Digits: 3}) // second component
 				coords = append(coords, LPFloat{Value: melFrames[j+i][2], Digits: 3}) // third component
 			}
 			var keycoords []float64
-			for i := 0; i < freqs; i++ {
+			for i := 0; i < m.NumFreqs; i++ {
 				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
 				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
 			}
