@@ -221,7 +221,7 @@ func main() {
 					audio, sr, err = phase.LoadFlacSampleRate(path)
 				}
 				if isWav {
-					audio, sr, err = phase.LoadFlacSampleRate(path)
+					audio, sr, err = phase.LoadWavSampleRate(path)
 				}
 				if err != nil {
 					fmt.Println(err.Error())
