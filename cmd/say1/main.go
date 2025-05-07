@@ -61,7 +61,7 @@ func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename st
 	case 384 * 2:
 		samplerate = 48000
 	case 418 * 2:
-		samplerate = 44000
+		samplerate = 44100
 	default:
 		println("freqs:", freqs)
 		panic("unsupported sample rate")
