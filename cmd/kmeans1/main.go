@@ -103,6 +103,16 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 	return nil
 }
 
+func which(n int, possibilities []int) (int, int) {
+	for i, v := range possibilities {
+		if n < v {
+			return i, n
+		}
+		n -= v
+	}
+	return -1, -1
+}
+
 func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 	if zerosCount == 0 {
 		return audio
@@ -131,16 +141,26 @@ func main() {
 	m.Resolut = 2048 * 2
 	var zerosToStuff = 0
 
-	var files []string
+	var filesFlac, filesWav []string
 	modeldir := `../../dict/slovak/`
 	dirname := modeldir + "flac/"
 	filepath.Walk(dirname, func(path string, info fs.FileInfo, err error) error {
-		if !strings.HasSuffix(path, ".flac") {
+		var isFlac = strings.HasSuffix(path, ".flac")
+		var isWav = strings.HasSuffix(path, ".wav")
+		if !isFlac && !isWav {
 			return nil
 		}
-		if len(files) < limit {
+		if len(filesFlac)+len(filesWav) < limit {
 			if m.NumFreqs == 0 {
-				audio, sr, err := phase.LoadFlacSampleRate(path)
+				var audio []float64
+				var sr uint32
+				var err error
+				if isFlac {
+					audio, sr, err = phase.LoadFlacSampleRate(path)
+				}
+				if isWav {
+					audio, sr, err = phase.LoadFlacSampleRate(path)
+				}
 				if err != nil {
 					fmt.Println(err.Error())
 					return nil
@@ -166,7 +186,12 @@ func main() {
 					zerosToStuff = 1
 				}
 			}
-			files = append(files, path)
+			if isFlac {
+				filesFlac = append(filesFlac, path)
+			}
+			if isWav {
+				filesWav = append(filesWav, path)
+			}
 		}
 		return nil
 	})
@@ -187,14 +212,22 @@ func main() {
 		//var dataset_discarded atomic.Uint64
 		var dataset_total atomic.Uint64
 
-		parallel.ForEach(len(files), 1000, func(i int) {
+		parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
 
 			if i%chunks != chunk {
 				return
 			}
 
+			var audioSamples []float64
 			// Load audio samples
-			audioSamples := zeroStuffing(phase.LoadFlac(files[i]), zerosToStuff)
+			switch index, pos := which(i, []int{len(filesFlac), len(filesWav)}); index {
+			case 0:
+				audioSamples = zeroStuffing(phase.LoadFlac(filesFlac[pos]), zerosToStuff)
+			case 1:
+				audioSamples = zeroStuffing(phase.LoadWav(filesWav[pos]), zerosToStuff)
+			default:
+				return
+			}
 
 			// Convert to mel spectrogram (returns [][3]float64 where each element is [m.NumFreqs]float64 for sine and cosine and real)
 			melFrames, err := m.ToPhase(audioSamples)
@@ -218,7 +251,11 @@ func main() {
 			//dataset_discarded.Add(discarded)
 			dataset_total.Add(uint64(len(melFrames)) / uint64(m.NumFreqs))
 			dataset_progress.Add(uint64(chunks))
-			progressbar(dataset_progress.Load(), uint64(len(files)))
+			if dataset_progress.Load() > uint64(len(filesFlac)+len(filesWav)) {
+				progressbar(1, 1)
+			} else {
+				progressbar(dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
+			}
 			//println(discarded)
 		})
 
@@ -285,10 +322,21 @@ func main() {
 
 	// 6. convert wavs to codewords
 
-	parallel.ForEach(len(files), 1000, func(i int) {
+	parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
 
+		var audioSamples []float64
+		var fileName string
 		// Load audio samples
-		audioSamples := zeroStuffing(phase.LoadFlac(files[i]), zerosToStuff)
+		switch index, pos := which(i, []int{len(filesFlac), len(filesWav)}); index {
+		case 0:
+			fileName = filesFlac[pos]
+			audioSamples = zeroStuffing(phase.LoadFlac(fileName), zerosToStuff)
+		case 1:
+			fileName = filesWav[pos]
+			audioSamples = zeroStuffing(phase.LoadWav(fileName), zerosToStuff)
+		default:
+			return
+		}
 
 		// Convert to mel spectrogram (returns [][3]float64 where each element is [m.NumFreqs]float64 for sine and cosine and real)
 		melFrames, err := m.ToPhase(audioSamples)
@@ -324,7 +372,7 @@ func main() {
 			}
 			fileMutex.Unlock()
 		}
-		fmt.Println(files[i], vec)
+		fmt.Println(fileName, vec)
 	})
 	// Output to file
 	{
