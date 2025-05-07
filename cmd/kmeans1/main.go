@@ -117,6 +117,36 @@ func which(n int, possibilities []int) (int, int) {
 	return -1, -1
 }
 
+type Stuffer int
+
+func (numFreqs *Stuffer) doZeroStuff(audio []float64, sampleRate uint32, err error) ([]float64, int) {
+	if err != nil {
+		return nil, 0
+	}
+	switch sampleRate {
+	case 8000, 16000, 48000:
+		if *numFreqs != 384*2 {
+			return nil, 0
+		}
+	case 11025, 22050, 44100:
+		if *numFreqs != 418*2 {
+			return nil, 0
+		}
+	}
+	switch sampleRate {
+	case 8000:
+		return audio, 5
+	case 11025:
+		return audio, 3
+	case 16000:
+		return audio, 2
+	case 22050:
+		return audio, 1
+	default:
+		return audio, 0
+	}
+}
+
 func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 	if zerosCount == 0 {
 		return audio
@@ -155,7 +185,6 @@ func main() {
 	m.Window = 640 * 2
 	m.NumFreqs = 0 // unknown
 	m.Resolut = 2048 * 2
-	var zerosToStuff = 0
 
 	var filesFlac, filesWav []string
 	filepath.Walk(*srcDir, func(path string, info fs.FileInfo, err error) error {
@@ -189,16 +218,6 @@ func main() {
 				case 11025, 22050, 44100:
 					m.NumFreqs = 418 * 2
 				}
-				switch sr {
-				case 8000:
-					zerosToStuff = 5
-				case 11025:
-					zerosToStuff = 3
-				case 16000:
-					zerosToStuff = 2
-				case 22050:
-					zerosToStuff = 1
-				}
 			}
 			if isFlac {
 				filesFlac = append(filesFlac, path)
@@ -213,6 +232,7 @@ func main() {
 	if m.NumFreqs == 0 {
 		panic("couldn't figure out project sample rate - no relevant files found?")
 	}
+	var s Stuffer = Stuffer(m.NumFreqs)
 
 	// dataset for master problem
 	var master clusters.Observations
@@ -236,9 +256,9 @@ func main() {
 			// Load audio samples
 			switch index, pos := which(i, []int{len(filesFlac), len(filesWav)}); index {
 			case 0:
-				audioSamples = zeroStuffing(phase.LoadFlac(filesFlac[pos]), zerosToStuff)
+				audioSamples = zeroStuffing(s.doZeroStuff(phase.LoadFlacSampleRate(filesFlac[pos])))
 			case 1:
-				audioSamples = zeroStuffing(phase.LoadWav(filesWav[pos]), zerosToStuff)
+				audioSamples = zeroStuffing(s.doZeroStuff(phase.LoadWavSampleRate(filesWav[pos])))
 			default:
 				return
 			}
@@ -298,6 +318,7 @@ func main() {
 		for _, c := range clu {
 			master = append(master, c.Center)
 		}
+
 	}
 
 	ShuffleSlice(master)
@@ -344,10 +365,10 @@ func main() {
 		switch index, pos := which(i, []int{len(filesFlac), len(filesWav)}); index {
 		case 0:
 			fileName = filesFlac[pos]
-			audioSamples = zeroStuffing(phase.LoadFlac(fileName), zerosToStuff)
+			audioSamples = zeroStuffing(s.doZeroStuff(phase.LoadFlacSampleRate(fileName)))
 		case 1:
 			fileName = filesWav[pos]
-			audioSamples = zeroStuffing(phase.LoadWav(fileName), zerosToStuff)
+			audioSamples = zeroStuffing(s.doZeroStuff(phase.LoadWavSampleRate(fileName)))
 		default:
 			return
 		}
