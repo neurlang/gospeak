@@ -22,6 +22,10 @@ import (
 import (
 	"math/rand/v2"
 )
+import (
+	"flag"
+	"os"
+)
 
 func emptySpace(space int) string {
 	emptySpace := ""
@@ -128,6 +132,18 @@ func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 }
 
 func main() {
+	srcDir := flag.String("srcdir", "", "path to directory containing wav or flac files to generate codec for")
+	dstDir := flag.String("dstdir", "", "path to directory to write generated codec to")
+	flag.Parse()
+	if srcDir == nil || *srcDir == "" {
+		println("srcdir is mandatory")
+		return
+	}
+	if dstDir == nil || *dstDir == "" {
+		println("dstdir is mandatory")
+		return
+	}
+
 	const chunks = 64
 	const limit = 9999999999999999
 	const kmeanz = 4096 // 32767
@@ -142,9 +158,7 @@ func main() {
 	var zerosToStuff = 0
 
 	var filesFlac, filesWav []string
-	modeldir := `../../dict/slovak/`
-	dirname := modeldir + "flac/"
-	filepath.Walk(dirname, func(path string, info fs.FileInfo, err error) error {
+	filepath.Walk(*srcDir, func(path string, info fs.FileInfo, err error) error {
 		var isFlac = strings.HasSuffix(path, ".flac")
 		var isWav = strings.HasSuffix(path, ".wav")
 		if !isFlac && !isWav {
@@ -381,7 +395,7 @@ func main() {
 			panic(err)
 		}
 		data = bytes.ReplaceAll(data, []byte(`],`), []byte("],\n"))
-		err = ioutil.WriteFile(modeldir+`centroids.json`, data, 0755)
+		err = ioutil.WriteFile(*dstDir+string(os.PathSeparator)+`centroids.json`, data, 0755)
 		if err != nil {
 			panic(err)
 		}
