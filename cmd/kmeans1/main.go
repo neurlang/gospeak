@@ -387,6 +387,8 @@ func main() {
 
 	// 6. convert wavs to codewords
 
+	align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
+
 	parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
 
 		var audioSamples []float64
@@ -438,7 +440,15 @@ func main() {
 			fileMutex.Unlock()
 		}
 		fmt.Println(fileName, vec)
+		if align != nil {
+			fileMutex.Lock()
+			fmt.Fprintln(align, fileName, vec)
+			fileMutex.Unlock()
+		}
 	})
+	if align != nil {
+		align.Close()
+	}
 	// Output to file
 	{
 		data, err := json.Marshal(file)
