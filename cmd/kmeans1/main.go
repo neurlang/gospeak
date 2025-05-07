@@ -161,8 +161,8 @@ func main() {
 			for j := 0; j < len(melFrames); j += freqs {
 				var keycoords []float64
 				for i := 0; i < freqs; i++ {
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][2])), 2))))
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2))))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
+					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
 
 				}
 				var coords = clusters.Coordinates(keycoords)
@@ -263,8 +263,8 @@ func main() {
 			}
 			var keycoords []float64
 			for i := 0; i < freqs; i++ {
-				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][2])), 2))))
-				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp(melFrames[j+i][1])), 2))))
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
+				keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
 			}
 			var sample = clusters.Coordinates(keycoords)
 			codeword := clu.Nearest(sample)
