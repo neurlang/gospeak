@@ -32,6 +32,8 @@ github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762 h1:p4A2Jx7Lm3NV98V
 github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762/go.mod h1:mw5KDqUj0eLj/6DUNINLVJNoPTFkEuGMHtJsXLviLkY=
 github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff h1:hhjCS30yFXud/+Jhn5abO/C/llEaBXs2rfRqyJ2JW6o=
 github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff/go.mod h1:E4XumjY7XBOZldR64dfPp/H26adyl+HysU3TWWavRbo=
+github.com/neurlang/gomel v0.0.6 h1:KIONYW87mb1ozNnR9p+eYLLMiko4JCs1Ad55T2phdjs=
+github.com/neurlang/gomel v0.0.6/go.mod h1:RcyfUJooN5YVC1/yq8gwo1Lg8uvtknQhSLOzD8ixG6M=
 github.com/neurlang/kmeans v0.0.0-20250505180154-3cd9646689cc h1:rnKAlbhi10WFzfc2wR3vIyAeU03eJut0Dv2+knpTopM=
 github.com/neurlang/kmeans v0.0.0-20250505180154-3cd9646689cc/go.mod h1:3xgtOGhhuAJKHvn0F4RpGA464T6W1gd2LdP1rkMmjSI=
 github.com/neurlang/quaternary v0.1.1 h1:9pF/dTDM+KWHuDTlv0AN1RTS30Q3ekys1B0nNRU8f0w=

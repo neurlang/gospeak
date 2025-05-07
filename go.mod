@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762
 	github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff
-	github.com/neurlang/gomel v0.0.5
+	github.com/neurlang/gomel v0.0.6
 	github.com/neurlang/kmeans v0.0.0-20250505180154-3cd9646689cc
 
 )

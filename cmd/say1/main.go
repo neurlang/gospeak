@@ -54,11 +54,25 @@ func centroids_unpad(centroids []uint32) []uint32 {
 }
 
 func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename string) {
+
+	var samplerate int
+	var freqs = len(all_centroids[0])/3
+	switch freqs {
+	case 384 * 2:
+		samplerate = 48000
+	case 418 * 2:
+		samplerate = 44000
+	default:
+		println("freqs:", freqs)
+		panic("unsupported sample rate")
+	}
+
 	m := phase.NewPhase()
 	m.YReverse = true
 	m.Window = 640 * 2
-	m.NumFreqs = 384 * 2
+	m.NumFreqs = freqs
 	m.Resolut = 2048 * 2
+	m.VolumeBoost = 4
 
 	fmt.Println(centroids)
 
@@ -82,7 +96,7 @@ func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename st
 	if err != nil {
 		panic(err)
 	}
-	phase.SaveWav(filename, speech, 48000)
+	phase.SaveWav(filename, speech, samplerate)
 }
 
 func predict_acoustic_codewords(line string, fanout1 int, bigrams map[string]map[string]int, net feedforward.FeedforwardNetwork) (ret []uint32) {
