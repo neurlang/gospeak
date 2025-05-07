@@ -162,6 +162,26 @@ func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 	return
 }
 
+func chunksKmeanzMasterkmeanz(filesCount int) (int, int, int) {
+	var chunks = 64
+	var kmeanz = 4096 // 32767
+	var masterkmeanz = 32767
+	for filesCount > 16384 {
+		chunks *= 2
+		filesCount /= 2
+	}
+	for filesCount < 8192 && kmeanz > 512 {
+		kmeanz /= 2
+		filesCount *= 2
+	}
+	for filesCount < 8192 {
+		masterkmeanz /= 2
+		chunks /= 2
+		filesCount *= 2
+	}
+	return chunks, kmeanz, masterkmeanz
+}
+
 func main() {
 	srcDir := flag.String("srcdir", "", "path to directory containing wav or flac files to generate codec for")
 	dstDir := flag.String("dstdir", "", "path to directory to write generated codec to")
@@ -176,10 +196,7 @@ func main() {
 		return
 	}
 
-	const chunks = 64
 	const limit = 9999999999999999
-	const kmeanz = 4096 // 32767
-	const masterkmeanz = 32767
 
 	// 1. Load FLAC file and convert to phase spectrogram
 	m := phase.NewPhase()
@@ -235,6 +252,12 @@ func main() {
 		panic("couldn't figure out project sample rate - no relevant files found?")
 	}
 	var s Stuffer = Stuffer(m.NumFreqs)
+
+	var chunks, kmeanz, masterkmeanz = chunksKmeanzMasterkmeanz(len(filesFlac) + len(filesWav))
+	println("Files:", len(filesFlac)+len(filesWav))
+	println("Chunks:", chunks)
+	println("Kmeans:", kmeanz)
+	println("Master Kmeans:", masterkmeanz)
 
 	// dataset for master problem
 	var master clusters.Observations
