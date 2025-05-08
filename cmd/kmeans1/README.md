@@ -98,6 +98,13 @@ Upon successful completion, the program will:
 - Check file permissions for source and destination directories
 - For debugging the custom command, use the `--executedbg` flag
 
+## Execute flag variables
+
+| variable | type | meaning |
+|-----------------|-----|--------|
+| STAGE_NUMBER | integer | 1 ~ TOTAL_STAGES |
+| TOTAL_STAGES | integer constant | 2*chunks+2 |
+
 ## License
 
 MIT license 
