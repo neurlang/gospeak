@@ -7,5 +7,8 @@ The decode command now:
 - Takes output WAV path (-o)
 - Requires centroids.json file (-v)
 
-The encode command is currently a placeholder and needs to be implemented
-with actual audio processing logic later.
+The encode command now:
+
+- Takes input WAV path (-i)
+- Takes optional output WAV path (-o) (if not provided, writes to console)
+- Requires centroids.json file (-v)
