@@ -96,14 +96,19 @@ func handleDecode() {
 }
 
 func handleEncode() {
-	/*
-		cmd := flag.NewFlagSet("encode", flag.ExitOnError)
-		inputFile := cmd.String("i", "", "Input WAV file path")
-		outputFile := cmd.String("o", "", "Output JSON file path")
-		centroidsFile := cmd.String("v", "", "Centroids JSON file path")
+	cmd := flag.NewFlagSet("encode", flag.ExitOnError)
+	inputFile := cmd.String("i", "", "Input WAV file path")
+	outputFile := cmd.String("o", "", "Output JSON file path")
+	centroidsFile := cmd.String("v", "", "Centroids JSON file path")
 
-		cmd.Parse(os.Args[2:])
-	*/
-	fmt.Println("Encode command is not yet implemented")
-	os.Exit(1)
+	cmd.Parse(os.Args[2:])
+
+	if *inputFile == "" || *centroidsFile == "" {
+		fmt.Println("Input file and centroids file are required")
+		cmd.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Process audio
+	centroids_unvocode(*inputFile, *centroidsFile, *outputFile)
 }
