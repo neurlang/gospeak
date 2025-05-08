@@ -176,7 +176,9 @@ func chunksKmeanzMasterkmeanz(filesCount int) (int, int, int) {
 	}
 	for filesCount < 8192 {
 		masterkmeanz /= 2
-		chunks /= 2
+		if chunks > 1 {
+			chunks /= 2
+		}
 		filesCount *= 2
 	}
 	return chunks, kmeanz, masterkmeanz
