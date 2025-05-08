@@ -42,12 +42,12 @@ func progressBar(progress, width int) string {
 	}
 	return progressBar
 }
-func progressbar(pos, max uint64) {
+func progressbar(stage, stages int, pos, max uint64) {
 	const progressBarWidth = 40
 	if max > 0 {
 		progress := int(pos * progressBarWidth / max)
 		percent := int(pos * 100 / max)
-		fmt.Printf("\r[%s%s] %d%% ", progressBar(progress, progressBarWidth), emptySpace(progressBarWidth-progress), percent)
+		fmt.Printf("\r%d/%d [%s%s] %d%% ", stage, stages, progressBar(progress, progressBarWidth), emptySpace(progressBarWidth-progress), percent)
 	}
 }
 
@@ -69,6 +69,9 @@ func ShuffleSlice[T any](slice []T) {
 }
 
 type plotter struct {
+	stage  int
+	stages int
+
 	del float64
 	bas float64
 	itr uint64
@@ -100,9 +103,9 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 		if percent < int64(p.itr) {
 			percent = int64(p.itr)
 		}
-		progressbar(uint64(percent), 96)
+		progressbar(p.stage, p.stages, uint64(percent), 96)
 	} else {
-		progressbar(p.itr, 96)
+		progressbar(p.stage, p.stages, p.itr, 96)
 	}
 	p.itr++
 	return nil
@@ -235,8 +238,10 @@ func main() {
 				println("Sample rate:", sr)
 				switch sr {
 				case 8000, 16000, 48000:
+					println("Codec native sample rate: 48000")
 					m.NumFreqs = 384 * 2
 				case 11025, 22050, 44100:
+					println("Codec native sample rate: 44100")
 					m.NumFreqs = 418 * 2
 				}
 			}
@@ -265,6 +270,7 @@ func main() {
 	var master clusters.Observations
 
 	for chunk := 0; chunk < chunks; chunk++ {
+		fmt.Println()
 
 		// 2. Prepare dataset for K-means
 		var dataset clusters.Observations
@@ -313,22 +319,22 @@ func main() {
 			dataset_total.Add(uint64(len(melFrames)) / uint64(m.NumFreqs))
 			dataset_progress.Add(uint64(chunks))
 			if dataset_progress.Load() > uint64(len(filesFlac)+len(filesWav)) {
-				progressbar(1, 1)
+				progressbar(2*chunk+1, 2*chunks+2, 1, 1)
 			} else {
-				progressbar(dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
+				progressbar(2*chunk+1, 2*chunks+2, dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
 			}
 			//println(discarded)
 		})
-
+		progressbar(2*chunk+1, 2*chunks+2, 1, 1)
 		fmt.Println()
 
 		//println("Silence discarded: ", dataset_discarded.Load() * 100 / dataset_total.Load() , "%")
 
 		ShuffleSlice(dataset)
 
-		progressbar(0, 1)
+		progressbar(2*chunk+2, 2*chunks+2, 0, 1)
 
-		plotter := &plotter{del: 0.05}
+		plotter := &plotter{stage: 2*chunk + 2, stages: 2*chunks + 2, del: 0.05}
 
 		// 3. Run K-means clustering
 		km, err := kmeans.NewWithOptions(0.05, plotter)
@@ -354,11 +360,11 @@ func main() {
 	}
 
 	ShuffleSlice(master)
-
+	progressbar(2*chunks, 2*chunks+2, 1, 1)
 	fmt.Println()
-	progressbar(0, 1)
+	progressbar(2*chunks+1, 2*chunks+2, 0, 1)
 
-	plotter := &plotter{del: 0.05}
+	plotter := &plotter{stage: 2*chunks + 1, stages: 2*chunks + 2, del: 0.05}
 
 	// 4. Run master K-means clustering
 	km, err := kmeans.NewWithOptions(0.05, plotter)
@@ -388,7 +394,10 @@ func main() {
 	}
 
 	// 6. convert wavs to codewords
-
+	var final_dump_progress atomic.Uint64
+	progressbar(2*chunks+1, 2*chunks+2, 1, 1)
+	fmt.Println()
+	progressbar(2*chunks+2, 2*chunks+2, 0, 1)
 	align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
 
 	parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
@@ -441,16 +450,21 @@ func main() {
 			}
 			fileMutex.Unlock()
 		}
-		fmt.Println(fileName, vec)
+		//fmt.Println(fileName, vec)
 		if align != nil {
 			fileMutex.Lock()
 			fmt.Fprintln(align, fileName, vec)
 			fileMutex.Unlock()
 		}
+		progressbar(2*chunks+2, 2*chunks+2, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
+		final_dump_progress.Add(1)
 	})
 	if align != nil {
 		align.Close()
 	}
+	progressbar(2*chunks+2, 2*chunks+2, 1, 1)
+	fmt.Println()
+
 	// Output to file
 	{
 		data, err := json.Marshal(file)
@@ -464,5 +478,6 @@ func main() {
 		}
 		fmt.Printf("Total clusters: %d\n", len(clu))
 	}
+	fmt.Println("Codec solved: true")
 
 }
