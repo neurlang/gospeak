@@ -187,10 +187,34 @@ func chunksKmeanzMasterkmeanz(filesCount int) (int, int, int) {
 	return chunks, kmeanz, masterkmeanz
 }
 
+func command(execString string, chunk, chunks int, wait, debug bool) {
+	if strings.Contains(execString, `STAGE_NUMBER`) {
+		execString = strings.ReplaceAll(execString, `STAGE_NUMBER`, fmt.Sprint(chunk))
+	}
+	if strings.Contains(execString, `TOTAL_STAGES`) {
+		execString = strings.ReplaceAll(execString, `TOTAL_STAGES`, fmt.Sprint(chunks))
+	}
+	var execVect = strings.Fields(execString)
+	fmt.Println("\nRunning:", execVect)
+	if len(execVect) != 0 {
+		cmd := exec.Command(execVect[0], execVect[1:]...)
+		if debug {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
+		if !wait {
+			cmd.Start()
+		} else {
+			cmd.Run()
+		}
+	}
+}
+
 func main() {
 	srcDir := flag.String("srcdir", "", "path to directory containing wav or flac files to generate codec for")
 	dstDir := flag.String("dstdir", "", "path to directory to write generated codec to")
 	execute := flag.String("execute", "", "a command to run after each phase gets solved")
+	executedbg := flag.Bool("executedbg", false, "debug execute command, attaches stdout/stderr")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -326,6 +350,10 @@ func main() {
 			//println(discarded)
 		})
 		progressbar(2*chunk+1, 2*chunks+2, 1, 1)
+		if execute != nil && *execute != "" {
+			command(*execute, 2*chunk+1, 2*chunks+2, false, executedbg != nil && *executedbg)
+		}
+
 		fmt.Println()
 
 		//println("Silence discarded: ", dataset_discarded.Load() * 100 / dataset_total.Load() , "%")
@@ -351,11 +379,9 @@ func main() {
 		for _, c := range clu {
 			master = append(master, c.Center)
 		}
+		progressbar(2*chunk+2, 2*chunks+2, 1, 1)
 		if execute != nil && *execute != "" {
-			var execVect = strings.Fields(*execute)
-			if len(execVect) != 0 {
-				exec.Command(execVect[0], execVect[1:]...).Start()
-			}
+			command(*execute, 2*chunk+2, 2*chunks+2, false, executedbg != nil && *executedbg)
 		}
 	}
 
@@ -396,6 +422,9 @@ func main() {
 	// 6. convert wavs to codewords
 	var final_dump_progress atomic.Uint64
 	progressbar(2*chunks+1, 2*chunks+2, 1, 1)
+	if execute != nil && *execute != "" {
+		command(*execute, 2*chunks+1, 2*chunks+2, false, executedbg != nil && *executedbg)
+	}
 	fmt.Println()
 	progressbar(2*chunks+2, 2*chunks+2, 0, 1)
 	align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
@@ -479,5 +508,7 @@ func main() {
 		fmt.Printf("Total clusters: %d\n", len(clu))
 	}
 	fmt.Println("Codec solved: true")
-
+	if execute != nil && *execute != "" {
+		command(*execute, 2*chunks+2, 2*chunks+2, true, executedbg != nil && *executedbg)
+	}
 }
