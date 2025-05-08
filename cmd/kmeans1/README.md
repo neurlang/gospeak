@@ -11,7 +11,7 @@ a compact representation of vocal characteristics that can be used for speech en
 - Processes audio files to create a speaker-specific codec
 - Supports multiple processing stages with progress tracking
 - Sample rates auto detection
-- Automatically chooses cluster counts ()
+- Automatically chooses cluster counts
 - Optional debug execution mode
 
 ## Requirements
@@ -19,6 +19,23 @@ a compact representation of vocal characteristics that can be used for speech en
 - Linux environment
 - Audio files in FLAC or WAV formats
 - Sufficient disk space for processing
+
+## Speech Corpus Requirements
+
+- Supported format: FLAC (preferred) or WAV
+- Recommended at minimum 1024 files (split files on silence if few too long files)
+- If less than 1024 files, a lower quality and lower bitrate codec will be generated
+- One speaker per directory
+- All files share the same sample rate
+- Supported sample rate per directory:
+
+| Option A     | Option B     |
+|--------------|--------------|
+| 8000 Hz      | 11025 Hz     |
+| 16000 Hz     | 22050 Hz     |
+| **48000 Hz** | **44100 Hz** |
+
+Note: Codec native sample rate is in bold.
 
 ## Installation
 
