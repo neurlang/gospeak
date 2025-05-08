@@ -155,7 +155,7 @@ func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 	result = make([]float64, 0, len(audio)*(zerosCount+1))
 	for _, v := range audio {
 		result = append(result, v)
-		for i := 1; i < zerosCount; i++ {
+		for i := 0; i < zerosCount; i++ {
 			result = append(result, 0)
 		}
 	}
