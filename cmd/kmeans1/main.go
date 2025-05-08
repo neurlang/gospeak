@@ -358,6 +358,13 @@ func main() {
 
 		//println("Silence discarded: ", dataset_discarded.Load() * 100 / dataset_total.Load() , "%")
 
+		if len(dataset) < kmeanz {
+			ShuffleSlice(dataset)
+			for i := 0; len(dataset) < kmeanz; i++ {
+				dataset = append(dataset, dataset[i])
+			}
+		}
+
 		ShuffleSlice(dataset)
 
 		progressbar(2*chunk+2, 2*chunks+2, 0, 1)
