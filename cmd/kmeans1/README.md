@@ -27,6 +27,7 @@ a compact representation of vocal characteristics that can be used for speech en
 - If less than 1024 files, a lower quality and lower bitrate codec will be generated
 - One speaker per directory
 - All files share the same sample rate
+- All files must be [normalized](https://github.com/neurlang/gospeak/tree/master/prepare)
 - Supported sample rate per directory:
 
 | Option A     | Option B     |
