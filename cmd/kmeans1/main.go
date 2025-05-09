@@ -26,6 +26,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 func emptySpace(space int) string {
