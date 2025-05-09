@@ -77,6 +77,11 @@ type plotter struct {
 	itr uint64
 	pro uint64
 	cur uint64
+
+	// New fields
+	execString   string
+	executedbg   bool
+	execDetailed bool
 }
 
 func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
@@ -104,8 +109,14 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 			percent = int64(p.itr)
 		}
 		progressbar(p.stage, p.stages, uint64(percent), 96)
+		if p.execDetailed {
+			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(percent))
+		}
 	} else {
 		progressbar(p.stage, p.stages, p.itr, 96)
+		if p.execDetailed {
+			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(p.itr))
+		}
 	}
 	p.itr++
 	return nil
@@ -187,7 +198,16 @@ func chunksKmeanzMasterkmeanz(filesCount int) (int, int, int) {
 	return chunks, kmeanz, masterkmeanz
 }
 
-func command(execString string, chunk, chunks int, wait, debug bool) {
+func command(execString string, chunk, chunks int, wait, debug bool, percentage byte) {
+	rescaledPercent := (int(percentage) * 100) / 96
+	if rescaledPercent < 0 {
+		rescaledPercent = 0
+	} else if rescaledPercent > 100 {
+		rescaledPercent = 100
+	}
+	if strings.Contains(execString, `PERCENTAGE`) {
+		execString = strings.ReplaceAll(execString, "PERCENTAGE", fmt.Sprint(rescaledPercent))
+	}
 	if strings.Contains(execString, `STAGE_NUMBER`) {
 		execString = strings.ReplaceAll(execString, `STAGE_NUMBER`, fmt.Sprint(chunk))
 	}
@@ -215,6 +235,7 @@ func main() {
 	dstDir := flag.String("dstdir", "", "path to directory to write generated codec to")
 	execute := flag.String("execute", "", "a command to run after each phase gets solved")
 	executedbg := flag.Bool("executedbg", false, "debug execute command, attaches stdout/stderr")
+	execDetailed := flag.Bool("exec-detailed", false, "execute detailed command after each progress update")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -293,6 +314,19 @@ func main() {
 	// dataset for master problem
 	var master clusters.Observations
 
+	execString := ""
+	if execute != nil {
+		execString = *execute
+	}
+	execdbg := false
+	if executedbg != nil {
+		execdbg = *executedbg
+	}
+	execDet := false
+	if execDetailed != nil {
+		execDet = *execDetailed
+	}
+
 	for chunk := 0; chunk < chunks; chunk++ {
 		fmt.Println()
 
@@ -351,7 +385,7 @@ func main() {
 		})
 		progressbar(2*chunk+1, 2*chunks+2, 1, 1)
 		if execute != nil && *execute != "" {
-			command(*execute, 2*chunk+1, 2*chunks+2, false, executedbg != nil && *executedbg)
+			command(*execute, 2*chunk+1, 2*chunks+2, false, executedbg != nil && *executedbg, 96)
 		}
 
 		fmt.Println()
@@ -369,7 +403,14 @@ func main() {
 
 		progressbar(2*chunk+2, 2*chunks+2, 0, 1)
 
-		plotter := &plotter{stage: 2*chunk + 2, stages: 2*chunks + 2, del: 0.05}
+		plotter := &plotter{
+			stage:        2*chunk + 2,
+			stages:       2*chunks + 2,
+			del:          0.05,
+			execString:   execString,
+			executedbg:   execdbg,
+			execDetailed: execDet,
+		}
 
 		// 3. Run K-means clustering
 		km, err := kmeans.NewWithOptions(0.05, plotter)
@@ -388,7 +429,7 @@ func main() {
 		}
 		progressbar(2*chunk+2, 2*chunks+2, 1, 1)
 		if execute != nil && *execute != "" {
-			command(*execute, 2*chunk+2, 2*chunks+2, false, executedbg != nil && *executedbg)
+			command(*execute, 2*chunk+2, 2*chunks+2, false, executedbg != nil && *executedbg, 96)
 		}
 	}
 
@@ -397,7 +438,14 @@ func main() {
 	fmt.Println()
 	progressbar(2*chunks+1, 2*chunks+2, 0, 1)
 
-	plotter := &plotter{stage: 2*chunks + 1, stages: 2*chunks + 2, del: 0.05}
+	plotter := &plotter{
+		stage:        2*chunks + 1,
+		stages:       2*chunks + 2,
+		del:          0.05,
+		execString:   execString,
+		executedbg:   execdbg,
+		execDetailed: execDet,
+	}
 
 	// 4. Run master K-means clustering
 	km, err := kmeans.NewWithOptions(0.05, plotter)
@@ -430,7 +478,7 @@ func main() {
 	var final_dump_progress atomic.Uint64
 	progressbar(2*chunks+1, 2*chunks+2, 1, 1)
 	if execute != nil && *execute != "" {
-		command(*execute, 2*chunks+1, 2*chunks+2, false, executedbg != nil && *executedbg)
+		command(*execute, 2*chunks+1, 2*chunks+2, false, executedbg != nil && *executedbg, 96)
 	}
 	fmt.Println()
 	progressbar(2*chunks+2, 2*chunks+2, 0, 1)
@@ -516,6 +564,6 @@ func main() {
 	}
 	fmt.Println("Codec solved: true")
 	if execute != nil && *execute != "" {
-		command(*execute, 2*chunks+2, 2*chunks+2, true, executedbg != nil && *executedbg)
+		command(*execute, 2*chunks+2, 2*chunks+2, true, executedbg != nil && *executedbg, 96)
 	}
 }
