@@ -205,14 +205,16 @@ func command(execString string, chunk, chunks int, wait, debug bool, percentage 
 	} else if rescaledPercent > 100 {
 		rescaledPercent = 100
 	}
-	if strings.Contains(execString, `PERCENTAGE`) {
-		execString = strings.ReplaceAll(execString, "PERCENTAGE", fmt.Sprint(rescaledPercent))
-	}
-	if strings.Contains(execString, `STAGE_NUMBER`) {
-		execString = strings.ReplaceAll(execString, `STAGE_NUMBER`, fmt.Sprint(chunk))
-	}
-	if strings.Contains(execString, `TOTAL_STAGES`) {
-		execString = strings.ReplaceAll(execString, `TOTAL_STAGES`, fmt.Sprint(chunks))
+	for _, prefix := range []string{"%", ""} {
+		if strings.Contains(execString, prefix+`PERCENTAGE`) {
+			execString = strings.ReplaceAll(execString, prefix+"PERCENTAGE", fmt.Sprint(rescaledPercent))
+		}
+		if strings.Contains(execString, prefix+`STAGE_NUMBER`) {
+			execString = strings.ReplaceAll(execString, prefix+`STAGE_NUMBER`, fmt.Sprint(chunk))
+		}
+		if strings.Contains(execString, prefix+`TOTAL_STAGES`) {
+			execString = strings.ReplaceAll(execString, prefix+`TOTAL_STAGES`, fmt.Sprint(chunks))
+		}
 	}
 	var execVect = strings.Fields(execString)
 	fmt.Println("\nRunning:", execVect)
