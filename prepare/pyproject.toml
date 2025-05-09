@@ -1,0 +1,11 @@
+[project]
+name = "preprocess"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ffmpeg-normalize>=1.32.2",
+    "pydub>=0.25.1",
+    "tqdm>=4.67.1",
+]
