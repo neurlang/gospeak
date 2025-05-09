@@ -238,6 +238,7 @@ func main() {
 	execute := flag.String("execute", "", "a command to run after each phase gets solved")
 	executedbg := flag.Bool("executedbg", false, "debug execute command, attaches stdout/stderr")
 	execDetailed := flag.Bool("exec-detailed", false, "execute detailed command after each progress update")
+	threads := flag.Int("threads", runtime.NumCPU(), "number of threads (default NumCPU() at startup)")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -350,7 +351,7 @@ func main() {
 		//var dataset_discarded atomic.Uint64
 		var dataset_total atomic.Uint64
 
-		parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
+		parallel.ForEach(len(filesFlac)+len(filesWav), *threads, func(i int) {
 
 			if i%chunks != chunk {
 				return
@@ -427,7 +428,7 @@ func main() {
 
 		// 3. Run K-means clustering
 		km, err := kmeans.NewWithOptions(0.05, plotter)
-		km.Threads = 1000
+		km.Threads = *threads
 		if err != nil {
 			panic(err)
 		}
@@ -462,7 +463,7 @@ func main() {
 
 	// 4. Run master K-means clustering
 	km, err := kmeans.NewWithOptions(0.05, plotter)
-	km.Threads = 1000
+	km.Threads = *threads
 	if err != nil {
 		panic(err)
 	}
@@ -497,7 +498,7 @@ func main() {
 	progressbar(2*chunks+2, 2*chunks+2, 0, 1)
 	align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
 
-	parallel.ForEach(len(filesFlac)+len(filesWav), 1000, func(i int) {
+	parallel.ForEach(len(filesFlac)+len(filesWav), *threads, func(i int) {
 
 		var audioSamples []float64
 		var fileName string
