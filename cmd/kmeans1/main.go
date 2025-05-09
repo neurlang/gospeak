@@ -246,6 +246,17 @@ func main() {
 		return
 	}
 
+	// Check if dstDir exists and is a directory
+	dstInfo, err := os.Stat(*dstDir)
+	if os.IsNotExist(err) {
+		fmt.Printf("Error: destination directory '%s' does not exist\n", *dstDir)
+		return
+	}
+	if !dstInfo.IsDir() {
+		fmt.Printf("Error: '%s' is not a directory\n", *dstDir)
+		return
+	}
+
 	const limit = 9999999999999999
 
 	// 1. Load FLAC file and convert to phase spectrogram
