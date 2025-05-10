@@ -80,6 +80,9 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 			if len(centroidData.Centroids) <= rang {
 				break
 			}
+			if len(centroidData.Centroids[rang]) == 0 {
+				break
+			}
 
 			// Calculate key coordinates for current frame
 			var keyCoords []float64
