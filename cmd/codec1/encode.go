@@ -97,6 +97,7 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 				var valueCoords []float64
 				for i := 0; i < ranges[rang+1]-ranges[rang]; i++ {
 					if 3*i+2 >= len(centroid) {
+						println("exceeded len centroid", 3*i+2, len(centroid))
 						return
 					}
 					c0 := centroid[3*i]
@@ -109,6 +110,7 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 				}
 
 				if len(keyCoords) != len(valueCoords) {
+					println("keyCoords don't match valueCoords", len(keyCoords), len(valueCoords))
 					return
 				}
 
