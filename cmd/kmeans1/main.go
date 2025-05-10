@@ -569,19 +569,17 @@ func main() {
 		}
 		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
 		fmt.Println()
-
-	}
-
-	// Output to file
-	{
-		data, err := json.Marshal(file)
-		if err != nil {
-			panic(err)
-		}
-		data = bytes.ReplaceAll(data, []byte(`],`), []byte("],\n"))
-		err = ioutil.WriteFile(*dstDir+string(os.PathSeparator)+`centroids.json`, data, 0755)
-		if err != nil {
-			panic(err)
+		// Output to file
+		{
+			data, err := json.Marshal(file)
+			if err != nil {
+				panic(err)
+			}
+			data = bytes.ReplaceAll(data, []byte(`],`), []byte("],\n"))
+			err = ioutil.WriteFile(*dstDir+string(os.PathSeparator)+`centroids`+fmt.Sprint(rang)+`.json`, data, 0755)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 	fmt.Println("Codec solved: true")
