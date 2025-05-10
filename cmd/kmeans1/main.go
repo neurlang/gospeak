@@ -240,6 +240,7 @@ func main() {
 	executedbg := flag.Bool("executedbg", false, "debug execute command, attaches stdout/stderr")
 	execDetailed := flag.Bool("exec-detailed", false, "execute detailed command after each progress update")
 	threads := flag.Int("threads", runtime.NumCPU(), "number of threads (default NumCPU() at startup)")
+	quality := flag.Int("quality", 0, "quality increase factor (small integer, default 0)")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -323,7 +324,7 @@ func main() {
 	}
 	var s Stuffer = Stuffer(m.NumFreqs)
 
-	var chunks, kmeanz, masterkmeanz = chunksKmeanzMasterkmeanz(len(filesFlac)+len(filesWav), 0)
+	var chunks, kmeanz, masterkmeanz = chunksKmeanzMasterkmeanz(len(filesFlac)+len(filesWav), *quality)
 	println("Files:", len(filesFlac)+len(filesWav))
 	println("Chunks:", chunks)
 	println("Kmeans:", kmeanz)

@@ -55,7 +55,7 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 	if err != nil {
 		panic(fmt.Sprintf("Error creating spectrogram: %v", err))
 	}
-	
+
 	audio = nil
 
 	// Load centroids
@@ -65,7 +65,6 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 		panic(fmt.Sprintf("Error reading centroids: %v", err))
 	}
 	json.Unmarshal(data, &centroidData)
-
 
 	println(len(melFrames))
 
