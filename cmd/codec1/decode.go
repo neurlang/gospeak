@@ -5,10 +5,14 @@ import (
 	"github.com/neurlang/gomel/phase"
 )
 
-func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename string) {
+func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename string) {
 
 	var samplerate int
-	var freqs = len(all_centroids[0]) / 3
+	const padframes = 0
+	var freqs = padframes
+	for _, v := range all_centroids {
+		freqs += len(v[0]) / 3
+	}
 	switch freqs {
 	case 384 * 2:
 		samplerate = 48000
@@ -29,9 +33,13 @@ func centroids_vocode(centroids []uint32, all_centroids [][]float64, filename st
 	fmt.Println(centroids)
 
 	var buf [][3]float64
-	for _, centroid := range centroids {
+	for iii, centroid := range centroids {
+		ii := iii % 8
+		if ii == 0 {
+			buf = append(buf, make([][3]float64, padframes, padframes)...)
+		}
 		var prev0, prev1 float64
-		for i, float := range all_centroids[centroid] {
+		for i, float := range all_centroids[ii][centroid] {
 			if i%3 == 0 {
 				prev0 = float
 			} else if i%3 == 1 {

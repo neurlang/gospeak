@@ -80,7 +80,7 @@ func handleDecode() {
 	}
 
 	// Load centroids
-	var centroids struct{ Centroids [][]float64 }
+	var centroids struct{ Centroids [][][]float64 }
 	data, err := os.ReadFile(*centroidsFile)
 	if err != nil {
 		panic(fmt.Sprintf("Error reading centroids file: %v", err))
