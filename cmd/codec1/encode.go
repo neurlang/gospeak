@@ -97,6 +97,9 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 			minDist := math.MaxFloat64
 			nearestIdx := 0
 			for idx, centroid := range centroidData.Centroids[rang] {
+				if len(centroid) == 0 {
+					continue
+				}
 				var valueCoords []float64
 				for i := 0; i < ranges[rang+1]-ranges[rang]; i++ {
 					if 3*i+2 >= len(centroid) {
