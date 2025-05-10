@@ -8,15 +8,13 @@ import (
 func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename string) {
 
 	var samplerate int
-	const padframes = 0
-	var freqs = padframes
-	for _, v := range all_centroids {
-		freqs += len(v[0]) / 3
-	}
-	switch freqs {
-	case 384 * 2:
+	var freqs int
+	switch len(all_centroids[0][0]) / 3 {
+	case 38:
+		freqs = 384 * 2
 		samplerate = 48000
-	case 418 * 2:
+	case 41:
+		freqs = 418 * 2
 		samplerate = 44100
 	default:
 		println("freqs:", freqs)
@@ -33,10 +31,15 @@ func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename 
 	fmt.Println(centroids)
 
 	var buf [][3]float64
+	var done int
 	for iii, centroid := range centroids {
 		ii := iii % 8
 		if ii == 0 {
-			buf = append(buf, make([][3]float64, padframes, padframes)...)
+			buf = append(buf, make([][3]float64, freqs-done, freqs-done)...)
+			done = 0
+		}
+		if ii >= len(all_centroids) {
+			continue
 		}
 		var prev0, prev1 float64
 		for i, float := range all_centroids[ii][centroid] {
@@ -46,6 +49,7 @@ func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename 
 				prev1 = float
 			} else {
 				buf = append(buf, [3]float64{prev0, prev1, float})
+				done++
 			}
 		}
 	}
