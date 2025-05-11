@@ -108,6 +108,9 @@ Upon successful completion, the program will:
 | STAGE_NUMBER | integer | 1 ~ TOTAL_STAGES |
 | TOTAL_STAGES | integer constant | 2*chunks+2 |
 | PERCENTAGE | integer | 0-100 (per each stage) |
+| TOTAL_PERCENTAGE | integer | 0-100 (overall progress) |
+| STATUS | string | "loading"/"kmeans"/"final"/"dumping"/"complete" |
+
 
 ## License
 
