@@ -10,6 +10,50 @@ import (
 	"strings"
 )
 
+type Stuffer int
+
+func (numFreqs *Stuffer) doZeroStuff(audio []float64, sampleRate uint32, err error) ([]float64, int) {
+	if err != nil {
+		return nil, 0
+	}
+	switch sampleRate {
+	case 8000, 16000, 48000:
+		if *numFreqs != 384*2 {
+			return nil, 0
+		}
+	case 11025, 22050, 44100:
+		if *numFreqs != 418*2 {
+			return nil, 0
+		}
+	}
+	switch sampleRate {
+	case 8000:
+		return audio, 5
+	case 11025:
+		return audio, 3
+	case 16000:
+		return audio, 2
+	case 22050:
+		return audio, 1
+	default:
+		return audio, 0
+	}
+}
+
+func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
+	if zerosCount == 0 {
+		return audio
+	}
+	result = make([]float64, 0, len(audio)*(zerosCount+1))
+	for _, v := range audio {
+		result = append(result, v)
+		for i := 0; i < zerosCount; i++ {
+			result = append(result, 0)
+		}
+	}
+	return
+}
+
 func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 
 	var audio []float64
@@ -40,15 +84,17 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 
 	// Determine frequency bands based on sample rate
 	switch sampleRate {
-	case 44100:
+	case 11025, 22050, 44100:
 		m.NumFreqs = 418 * 2
 		ranges = []int{0, 41, 95, 145, 200, 254, 400, 545, 418 * 2}
-	case 48000:
+	case 8000, 16000, 48000:
 		m.NumFreqs = 384 * 2
 		ranges = []int{0, 38, 88, 134, 184, 234, 367, 501, 384 * 2}
 	default:
 		panic("Unsupported sample rate")
 	}
+	var s = Stuffer(m.NumFreqs)
+	audio = zeroStuffing((&s).doZeroStuff(audio, sampleRate, err))
 
 	// Convert to mel spectrogram
 	melFrames, err := m.ToPhase(audio)
