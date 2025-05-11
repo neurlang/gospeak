@@ -43,13 +43,44 @@ func progressBar(progress, width int) string {
 	}
 	return progressBar
 }
-func progressbar(stage, stages int, pos, max uint64) {
+func progressbar(stage, stages int, pos, max uint64, name string) {
 	const progressBarWidth = 40
 	if max > 0 {
 		progress := int(pos * progressBarWidth / max)
 		percent := int(pos * 100 / max)
-		fmt.Printf("\r%d/%d [%s%s] %d%% ", stage, stages, progressBar(progress, progressBarWidth), emptySpace(progressBarWidth-progress), percent)
+		fmt.Printf("\r%d/%d [%s%s] %d%% %s | %d%% ",
+			stage, stages, progressBar(progress, progressBarWidth),
+			emptySpace(progressBarWidth-progress), percent, name,
+			calculateOverallProgress(stage, stages, percent))
 	}
+}
+func calculateOverallProgress(currentStage, totalStages, currentStagePercent int) int {
+	if totalStages <= 0 {
+		return 0
+	}
+	if currentStage < 1 {
+		currentStage = 1
+	} else if currentStage > totalStages {
+		currentStage = totalStages
+	}
+	if currentStagePercent < 0 {
+		currentStagePercent = 0
+	} else if currentStagePercent > 100 {
+		currentStagePercent = 100
+	}
+
+	// Calculate progress from completed stages (0-10000 for 0.00%-100.00%)
+	completedStages := currentStage - 1
+	completedProgress := completedStages * 10000 / totalStages
+
+	// Calculate progress from current stage (0-10000 for 0.00%-100.00%)
+	currentStageContribution := currentStagePercent * 100 / totalStages
+
+	// Total progress (sum both parts)
+	totalProgress := completedProgress + currentStageContribution
+
+	// Convert back from 0-10000 scale to 0-100%
+	return totalProgress / 100
 }
 
 // Remove low-energy frames (silence) before clustering
@@ -83,6 +114,8 @@ type plotter struct {
 	execString   string
 	executedbg   bool
 	execDetailed bool
+
+	msg string
 }
 
 func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
@@ -109,12 +142,12 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 		if percent < int64(p.itr) {
 			percent = int64(p.itr)
 		}
-		progressbar(p.stage, p.stages, uint64(percent), 96)
+		progressbar(p.stage, p.stages, uint64(percent), 96, p.msg)
 		if p.execDetailed {
 			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(percent))
 		}
 	} else {
-		progressbar(p.stage, p.stages, p.itr, 96)
+		progressbar(p.stage, p.stages, p.itr, 96, p.msg)
 		if p.execDetailed {
 			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(p.itr))
 		}
@@ -404,13 +437,13 @@ func main() {
 				dataset_total.Add(uint64(len(melFrames)) / uint64(m.NumFreqs))
 				dataset_progress.Add(uint64(chunks))
 				if dataset_progress.Load() > uint64(len(filesFlac)+len(filesWav)) {
-					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "loading")
 				} else {
-					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
+					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "loading")
 				}
 				//println(discarded)
 			})
-			progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+			progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "loading")
 			if execute != nil && *execute != "" {
 				command(*execute, 2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
 			}
@@ -428,7 +461,7 @@ func main() {
 
 			ShuffleSlice(dataset)
 
-			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1)
+			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "kmeans")
 
 			plotter := &plotter{
 				stage:        2*chunk + 2 + (2*chunks+2)*rang,
@@ -437,6 +470,7 @@ func main() {
 				execString:   execString,
 				executedbg:   execdbg,
 				execDetailed: execDet,
+				msg:          "kmeans",
 			}
 
 			// 3. Run K-means clustering
@@ -454,16 +488,16 @@ func main() {
 			for _, c := range clu {
 				master = append(master, c.Center)
 			}
-			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "kmeans")
 			if execute != nil && *execute != "" {
 				command(*execute, 2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
 			}
 		}
 
 		ShuffleSlice(master)
-		progressbar(2*chunks+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+		progressbar(2*chunks+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "kmeans")
 		fmt.Println()
-		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1)
+		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "final")
 
 		plotter := &plotter{
 			stage:        2*chunks + 1 + (2*chunks+2)*rang,
@@ -472,6 +506,7 @@ func main() {
 			execString:   execString,
 			executedbg:   execdbg,
 			execDetailed: execDet,
+			msg:          "final",
 		}
 
 		// 4. Run master K-means clustering
@@ -498,12 +533,12 @@ func main() {
 
 		// 6. convert wavs to codewords
 		var final_dump_progress atomic.Uint64
-		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "final")
 		if execute != nil && *execute != "" {
 			command(*execute, 2*chunks+1, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
 		}
 		fmt.Println()
-		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1)
+		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "dumping")
 		align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
 
 		parallel.ForEach(len(filesFlac)+len(filesWav), *threads, func(i int) {
@@ -562,13 +597,13 @@ func main() {
 				fmt.Fprintln(align, fileName, vec)
 				fileMutex.Unlock()
 			}
-			progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)))
+			progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "dumping")
 			final_dump_progress.Add(1)
 		})
 		if align != nil {
 			align.Close()
 		}
-		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1)
+		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "dumping")
 		fmt.Println()
 		// Output to file
 		{
