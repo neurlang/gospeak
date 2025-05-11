@@ -280,6 +280,7 @@ func main() {
 	execDetailed := flag.Bool("exec-detailed", false, "execute detailed command after each progress update")
 	threads := flag.Int("threads", runtime.NumCPU(), "number of threads (default NumCPU() at startup)")
 	quality := flag.Int("quality", 0, "quality increase factor (small integer, default 0)")
+	checkpoints := flag.Int("checkpoints", 8, "number of checkpoints to preserve")
 	flag.Parse()
 	if srcDir == nil || *srcDir == "" {
 		println("srcdir is mandatory")
@@ -610,6 +611,10 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+		}
+		// Clean up old checkpoint if needed
+		if checkpoints != nil && rang-*checkpoints >= 0 {
+			os.Remove(*dstDir + string(os.PathSeparator) + `centroids` + fmt.Sprint(rang-*checkpoints) + `.json`)
 		}
 	}
 	fmt.Println("Codec solved: true")
