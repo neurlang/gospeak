@@ -84,6 +84,8 @@ The program provides progress information including:
 3. **Final Clustering**: Performs k-means clustering to create the codec representation
 4. **Finalization**: Completes codec generation, encodes all audio files using the codec and verifies success
 
+Phases 2,3,4 run 8 times in total, after each finalization, a partial codec gets checkpointed.
+
 ## Output
 
 Upon successful completion, the program will:
@@ -105,6 +107,7 @@ Upon successful completion, the program will:
 |-----------------|-----|--------|
 | STAGE_NUMBER | integer | 1 ~ TOTAL_STAGES |
 | TOTAL_STAGES | integer constant | 2*chunks+2 |
+| PERCENTAGE | integer | 0-100 (per each stage) |
 
 ## License
 
