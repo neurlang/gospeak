@@ -539,7 +539,6 @@ func main() {
 		}
 		fmt.Println()
 		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "dumping")
-		align, _ := os.Create(*dstDir + string(os.PathSeparator) + `align_problem_input.txt`)
 
 		parallel.ForEach(len(filesFlac)+len(filesWav), *threads, func(i int) {
 
@@ -563,8 +562,6 @@ func main() {
 				panic(err)
 			}
 
-			var vec []uint32
-
 			for j := 0; j < len(melFrames); j += m.NumFreqs {
 				// Convert [m.NumFreqs][3]float64 to a flat []float64 (1152 dimensions)
 				var coords []LPFloat
@@ -579,30 +576,21 @@ func main() {
 					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
 				}
 				var sample = clusters.Coordinates(keycoords)
-				codeword := clu.Nearest(sample)
-				dist := sample.Distance(clu[codeword].Center)
-				vec = append(vec, uint32(codeword))
+				for codeword := range clu {
+					dist := sample.Distance(clu[codeword].Center)
 
-				fileMutex.Lock()
-				// update solution's nearest Centroids
-				if dist < file.minDists[codeword] {
-					file.minDists[codeword] = dist
-					file.Centroids[rang][codeword] = coords
+					fileMutex.Lock()
+					// update solution's nearest Centroids
+					if dist < file.minDists[codeword] {
+						file.minDists[codeword] = dist
+						file.Centroids[rang][codeword] = coords
+					}
+					fileMutex.Unlock()
 				}
-				fileMutex.Unlock()
-			}
-			//fmt.Println(fileName, vec)
-			if align != nil {
-				fileMutex.Lock()
-				fmt.Fprintln(align, fileName, vec)
-				fileMutex.Unlock()
 			}
 			progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "dumping")
 			final_dump_progress.Add(1)
 		})
-		if align != nil {
-			align.Close()
-		}
 		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "dumping")
 		fmt.Println()
 		// Output to file
