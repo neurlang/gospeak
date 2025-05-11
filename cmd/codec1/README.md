@@ -10,5 +10,5 @@ The decode command now:
 The encode command now:
 
 - Takes input WAV path (-i)
-- Takes optional output WAV path (-o) (if not provided, writes to console)
+- Takes optional output JSON path (-o) (if not provided, writes to console)
 - Requires centroids.json file (-v)
