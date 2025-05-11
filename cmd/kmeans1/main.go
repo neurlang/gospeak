@@ -144,12 +144,12 @@ func (p *plotter) Plot(cc clusters.Clusters, iteration int) error {
 		}
 		progressbar(p.stage, p.stages, uint64(percent), 96, p.msg)
 		if p.execDetailed {
-			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(percent))
+			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(percent), p.msg)
 		}
 	} else {
 		progressbar(p.stage, p.stages, p.itr, 96, p.msg)
 		if p.execDetailed {
-			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(p.itr))
+			command(p.execString, p.stage, p.stages, false, p.executedbg, byte(p.itr), p.msg)
 		}
 	}
 	p.itr++
@@ -232,7 +232,7 @@ func chunksKmeanzMasterkmeanz(filesCount, qualityBoost int) (int, int, int) {
 	return chunks, kmeanz, masterkmeanz
 }
 
-func command(execString string, chunk, chunks int, wait, debug bool, percentage byte) {
+func command(execString string, chunk, chunks int, wait, debug bool, percentage byte, status string) {
 	rescaledPercent := (int(percentage) * 100) / 96
 	if rescaledPercent < 0 {
 		rescaledPercent = 0
@@ -240,6 +240,12 @@ func command(execString string, chunk, chunks int, wait, debug bool, percentage 
 		rescaledPercent = 100
 	}
 	for _, prefix := range []string{"%", ""} {
+		if strings.Contains(execString, prefix+`TOTAL_PERCENTAGE`) {
+			execString = strings.ReplaceAll(execString, prefix+"TOTAL_PERCENTAGE", fmt.Sprint(calculateOverallProgress(chunk, chunks, int(percentage))))
+		}
+		if strings.Contains(execString, prefix+`STATUS`) {
+			execString = strings.ReplaceAll(execString, prefix+"STATUS", status)
+		}
 		if strings.Contains(execString, prefix+`PERCENTAGE`) {
 			execString = strings.ReplaceAll(execString, prefix+"PERCENTAGE", fmt.Sprint(rescaledPercent))
 		}
@@ -445,7 +451,7 @@ func main() {
 			})
 			progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "loading")
 			if execute != nil && *execute != "" {
-				command(*execute, 2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
+				command(*execute, 2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "loading")
 			}
 
 			fmt.Println()
@@ -490,7 +496,7 @@ func main() {
 			}
 			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "kmeans")
 			if execute != nil && *execute != "" {
-				command(*execute, 2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
+				command(*execute, 2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "kmeans")
 			}
 		}
 
@@ -535,7 +541,7 @@ func main() {
 		var final_dump_progress atomic.Uint64
 		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "final")
 		if execute != nil && *execute != "" {
-			command(*execute, 2*chunks+1, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96)
+			command(*execute, 2*chunks+1, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "final")
 		}
 		fmt.Println()
 		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "dumping")
@@ -608,6 +614,6 @@ func main() {
 	}
 	fmt.Println("Codec solved: true")
 	if execute != nil && *execute != "" {
-		command(*execute, (2*chunks+2)*8, (2*chunks+2)*8, true, executedbg != nil && *executedbg, 96)
+		command(*execute, (2*chunks+2)*8, (2*chunks+2)*8, true, executedbg != nil && *executedbg, 96, "completed")
 	}
 }
