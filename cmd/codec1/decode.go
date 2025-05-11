@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"github.com/neurlang/gomel/phase"
 )
 
@@ -28,7 +28,7 @@ func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename 
 	m.Resolut = 2048 * 2
 	m.VolumeBoost = 4
 
-	fmt.Println(centroids)
+	//fmt.Println(centroids)
 
 	var buf [][3]float64
 	var done int

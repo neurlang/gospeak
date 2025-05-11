@@ -112,6 +112,34 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 	}
 	json.Unmarshal(data, &centroidData)
 
+	// Precompute valueCoords for all centroids
+	precomputedCentroidValueCoords := make([][][]float64, 8) // 8 ranges
+	for rang := 0; rang < 8; rang++ {
+		if rang >= len(centroidData.Centroids) {
+			continue
+		}
+		centroidsInRange := centroidData.Centroids[rang]
+		if len(centroidsInRange) == 0 {
+			continue
+		}
+		precomputedCentroidValueCoords[rang] = make([][]float64, len(centroidsInRange))
+		for idx, centroid := range centroidsInRange {
+			var valueCoords []float64
+			for i := 0; i < ranges[rang+1]-ranges[rang]; i++ {
+				if 3*i+2 >= len(centroid) {
+					panic(fmt.Sprintf("precomputation: exceeded len centroid %d >= %d", 3*i+2, len(centroid)))
+				}
+				c0 := centroid[3*i]
+				c1 := centroid[3*i+1]
+				c2 := centroid[3*i+2]
+				val1 := math.Sqrt(math.Pow(math.Exp2(c1), 2) + math.Pow(math.Exp2(c2), 2))
+				val2 := math.Sqrt(math.Pow(math.Exp2(c0), 2) + math.Pow(math.Exp2(c1), 2))
+				valueCoords = append(valueCoords, val1, val2)
+			}
+			precomputedCentroidValueCoords[rang][idx] = valueCoords
+		}
+	}
+
 	println(len(melFrames))
 
 	// Find nearest centroids for each frame
@@ -139,28 +167,11 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 				keyCoords = append(keyCoords, val1, val2)
 			}
 
-			// Find closest centroid
+			// Find closest centroid using precomputed valueCoords
 			minDist := math.MaxFloat64
 			nearestIdx := 0
-			for idx, centroid := range centroidData.Centroids[rang] {
-				if len(centroid) == 0 {
-					continue
-				}
-				var valueCoords []float64
-				for i := 0; i < ranges[rang+1]-ranges[rang]; i++ {
-					if 3*i+2 >= len(centroid) {
-						println("exceeded len centroid", 3*i+2, len(centroid))
-						return
-					}
-					c0 := centroid[3*i]
-					c1 := centroid[3*i+1]
-					c2 := centroid[3*i+2]
-
-					val1 := math.Sqrt(math.Pow(math.Exp2(c1), 2) + math.Pow(math.Exp2(c2), 2))
-					val2 := math.Sqrt(math.Pow(math.Exp2(c0), 2) + math.Pow(math.Exp2(c1), 2))
-					valueCoords = append(valueCoords, val1, val2)
-				}
-
+			for idx := range centroidData.Centroids[rang] {
+				valueCoords := precomputedCentroidValueCoords[rang][idx]
 				if len(keyCoords) != len(valueCoords) {
 					println("keyCoords don't match valueCoords", len(keyCoords), len(valueCoords))
 					return
