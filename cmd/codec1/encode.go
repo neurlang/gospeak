@@ -91,23 +91,22 @@ func centroids_load(centroidsFile string) [][][]float64 {
 	return precomputedCentroidValueCoords
 }
 
-func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile string) {
+func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte, err error) {
 
 	var audio []float64
 	var sampleRate uint32
-	var err error
 
 	if strings.HasSuffix(inputFile, ".flac") {
 		// Load flac file
 		audio, sampleRate, err = phase.LoadFlacSampleRate(inputFile)
 		if err != nil {
-			panic(fmt.Sprintf("Error loading audio: %v", err))
+			return nil, fmt.Errorf("Error loading audio: %v", err)
 		}
 	} else {
 		// Load audio file
 		audio, sampleRate, err = phase.LoadWavSampleRate(inputFile)
 		if err != nil {
-			panic(fmt.Sprintf("Error loading audio: %v", err))
+			return nil, fmt.Errorf("Error loading audio: %v", err)
 		}
 	}
 
@@ -128,7 +127,7 @@ func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile st
 		m.NumFreqs = 384 * 2
 		ranges = []int{0, 38, 88, 134, 184, 234, 367, 501, 384 * 2}
 	default:
-		panic("Unsupported sample rate")
+		return nil, fmt.Errorf("Unsupported sample rate")
 	}
 	var s = Stuffer(m.NumFreqs)
 	audio = zeroStuffing((&s).doZeroStuff(audio, sampleRate, err))
@@ -136,12 +135,12 @@ func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile st
 	// Convert to mel spectrogram
 	melFrames, err := m.ToPhase(audio)
 	if err != nil {
-		panic(fmt.Sprintf("Error creating spectrogram: %v", err))
+		return nil, fmt.Errorf("Error creating spectrogram: %v", err)
 	}
 
 	audio = nil
 
-	println(len(melFrames))
+	//println(len(melFrames))
 
 	// Find nearest centroids for each frame
 	frameSize := m.NumFreqs
@@ -173,8 +172,8 @@ func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile st
 			nearestIdx := 0
 			for idx, valueCoords := range centroids[rang] {
 				if len(keyCoords) != len(valueCoords) {
-					println("keyCoords don't match valueCoords", len(keyCoords), len(valueCoords))
-					return
+					println(len(keyCoords), len(valueCoords))
+					panic("keyCoords don't match valueCoords")
 				}
 
 				var dist float64
@@ -192,11 +191,5 @@ func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile st
 	})
 
 	// Output results
-	jsonData, _ := json.Marshal(indices)
-	if outputFile != "" {
-		os.WriteFile(outputFile, jsonData, 0644)
-		fmt.Printf("Encoded %d frames to %s\n", len(indices), outputFile)
-	} else {
-		fmt.Println(string(jsonData))
-	}
+	return json.Marshal(indices)
 }
