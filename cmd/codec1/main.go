@@ -110,5 +110,5 @@ func handleEncode() {
 	}
 
 	// Process audio
-	centroids_unvocode(*inputFile, *centroidsFile, *outputFile)
+	centroids_unvocode(*inputFile, centroids_load(*centroidsFile), *outputFile)
 }

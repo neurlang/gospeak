@@ -54,7 +54,44 @@ func zeroStuffing(audio []float64, zerosCount int) (result []float64) {
 	return
 }
 
-func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
+func centroids_load(centroidsFile string) [][][]float64 {
+
+	// Load centroids
+	var centroidData struct{ Centroids [][][]float64 }
+	data, err := os.ReadFile(centroidsFile)
+	if err != nil {
+		panic(fmt.Sprintf("Error reading centroids: %v", err))
+	}
+	json.Unmarshal(data, &centroidData)
+
+	// Precompute valueCoords for all centroids
+	precomputedCentroidValueCoords := make([][][]float64, 8) // 8 ranges
+	for rang := 0; rang < 8; rang++ {
+		if rang >= len(centroidData.Centroids) {
+			continue
+		}
+		centroidsInRange := centroidData.Centroids[rang]
+		if len(centroidsInRange) == 0 {
+			continue
+		}
+		precomputedCentroidValueCoords[rang] = make([][]float64, len(centroidsInRange))
+		for idx, centroid := range centroidsInRange {
+			var valueCoords []float64
+			for i := 0; 3*i+2 < len(centroid); i++ {
+				c0 := centroid[3*i]
+				c1 := centroid[3*i+1]
+				c2 := centroid[3*i+2]
+				val1 := math.Sqrt(math.Pow(math.Exp2(c1), 2) + math.Pow(math.Exp2(c2), 2))
+				val2 := math.Sqrt(math.Pow(math.Exp2(c0), 2) + math.Pow(math.Exp2(c1), 2))
+				valueCoords = append(valueCoords, val1, val2)
+			}
+			precomputedCentroidValueCoords[rang][idx] = valueCoords
+		}
+	}
+	return precomputedCentroidValueCoords
+}
+
+func centroids_unvocode(inputFile string, centroids [][][]float64, outputFile string) {
 
 	var audio []float64
 	var sampleRate uint32
@@ -104,42 +141,6 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 
 	audio = nil
 
-	// Load centroids
-	var centroidData struct{ Centroids [][][]float64 }
-	data, err := os.ReadFile(centroidsFile)
-	if err != nil {
-		panic(fmt.Sprintf("Error reading centroids: %v", err))
-	}
-	json.Unmarshal(data, &centroidData)
-
-	// Precompute valueCoords for all centroids
-	precomputedCentroidValueCoords := make([][][]float64, 8) // 8 ranges
-	for rang := 0; rang < 8; rang++ {
-		if rang >= len(centroidData.Centroids) {
-			continue
-		}
-		centroidsInRange := centroidData.Centroids[rang]
-		if len(centroidsInRange) == 0 {
-			continue
-		}
-		precomputedCentroidValueCoords[rang] = make([][]float64, len(centroidsInRange))
-		for idx, centroid := range centroidsInRange {
-			var valueCoords []float64
-			for i := 0; i < ranges[rang+1]-ranges[rang]; i++ {
-				if 3*i+2 >= len(centroid) {
-					panic(fmt.Sprintf("precomputation: exceeded len centroid %d >= %d", 3*i+2, len(centroid)))
-				}
-				c0 := centroid[3*i]
-				c1 := centroid[3*i+1]
-				c2 := centroid[3*i+2]
-				val1 := math.Sqrt(math.Pow(math.Exp2(c1), 2) + math.Pow(math.Exp2(c2), 2))
-				val2 := math.Sqrt(math.Pow(math.Exp2(c0), 2) + math.Pow(math.Exp2(c1), 2))
-				valueCoords = append(valueCoords, val1, val2)
-			}
-			precomputedCentroidValueCoords[rang][idx] = valueCoords
-		}
-	}
-
 	println(len(melFrames))
 
 	// Find nearest centroids for each frame
@@ -151,10 +152,10 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 			return
 		}
 		for rang := 0; rang < 8; rang++ {
-			if len(centroidData.Centroids) <= rang {
+			if len(centroids) <= rang {
 				break
 			}
-			if len(centroidData.Centroids[rang]) == 0 {
+			if len(centroids[rang]) == 0 {
 				break
 			}
 
@@ -170,8 +171,7 @@ func centroids_unvocode(inputFile, centroidsFile, outputFile string) {
 			// Find closest centroid using precomputed valueCoords
 			minDist := math.MaxFloat64
 			nearestIdx := 0
-			for idx := range centroidData.Centroids[rang] {
-				valueCoords := precomputedCentroidValueCoords[rang][idx]
+			for idx, valueCoords := range centroids[rang] {
 				if len(keyCoords) != len(valueCoords) {
 					println("keyCoords don't match valueCoords", len(keyCoords), len(valueCoords))
 					return
