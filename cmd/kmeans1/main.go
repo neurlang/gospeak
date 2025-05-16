@@ -542,7 +542,7 @@ func main() {
 		var final_dump_progress atomic.Uint64
 		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "final")
 		if execute != nil && *execute != "" {
-			command(*execute, 2*chunks+1, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "final")
+			command(*execute, 2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "final")
 		}
 		fmt.Println()
 		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "dumping")
