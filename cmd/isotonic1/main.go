@@ -2,131 +2,219 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"log"
 	"os"
+	"sort"
+	"strings"
 )
 
+type Entry struct {
+	String    string
+	Centroids []uint32
+	Collapsed []rune
+}
+
+func collapseRuns(s string) []rune {
+	var collapsed []rune
+	for _, r := range s {
+		if len(collapsed) == 0 || r != collapsed[len(collapsed)-1] {
+			collapsed = append(collapsed, r)
+		}
+	}
+	return collapsed
+}
+
 func main() {
-	data, err := os.ReadFile("../../dict/glados/study.json")
-	if err != nil {
-		panic(err)
+	// Parse command line flags
+	inputFile := flag.String("i", "", "Path to input file study.json")
+	sttFile := flag.String("o", "", "Path to output file stt.json")
+	verbose := flag.Bool("v", false, "Verbose output")
+	flag.Parse()
+
+	if *inputFile == "" || *sttFile == "" {
+		flag.Usage()
+		log.Fatal("Both -i and -s flags are required")
 	}
 
-	var input map[string][]uint32
-	err = json.Unmarshal(data, &input)
+	file, err := os.Open(*inputFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	data := make(map[string][]uint32)
+	if err := json.NewDecoder(file).Decode(&data); err != nil {
+		log.Fatal(err)
 	}
 
-	// Collect all unique characters across all strings
-	allChars := make(map[rune]struct{})
-	for s := range input {
-		for _, c := range s {
-			allChars[c] = struct{}{}
+	var hash = data[""]
+	delete(data, "")
+
+	var stringData []Entry
+	allCentroids := make(map[uint32]bool)
+
+	for s, centroids := range data {
+		collapsed := collapseRuns(s)
+		entry := Entry{
+			String:    s,
+			Centroids: centroids,
+			Collapsed: collapsed,
+		}
+		stringData = append(stringData, entry)
+		for _, cent := range centroids {
+			allCentroids[cent] = true
 		}
 	}
 
-	// Initialize possible characters for each centroid to all characters initially
-	possibleChars := make(map[uint32]map[rune]struct{})
-	// Track which centroids exist
-	centroidExists := make(map[uint32]bool)
-	for _, centroids := range input {
-		for _, cent := range centroids {
-			if !centroidExists[cent] {
-				pc := make(map[rune]struct{})
-				for c := range allChars {
-					pc[c] = struct{}{}
-				}
-				possibleChars[cent] = pc
-				centroidExists[cent] = true
+	possibleChars := make(map[uint32]map[rune]bool)
+	for _, entry := range stringData {
+		for _, cent := range entry.Centroids {
+			if _, ok := possibleChars[cent]; !ok {
+				possibleChars[cent] = make(map[rune]bool)
+			}
+			for _, c := range entry.Collapsed {
+				possibleChars[cent][c] = true
 			}
 		}
 	}
 
-	// First pass: Intersect possible characters with each entry's string
-	for s, centroids := range input {
-		charsInString := make(map[rune]struct{})
-		for _, c := range s {
-			charsInString[c] = struct{}{}
-		}
-
-		for _, cent := range centroids {
-			current := possibleChars[cent]
-			newPossible := make(map[rune]struct{})
-			for c := range current {
-				if _, ok := charsInString[c]; ok {
-					newPossible[c] = struct{}{}
-				}
-			}
-			possibleChars[cent] = newPossible
-		}
-	}
-
-	// Iteratively apply monotonic constraints
 	changed := true
-	for changed {
+	maxIterations := 20
+	for iter := 0; iter < maxIterations && changed; iter++ {
 		changed = false
+		newPossible := make(map[uint32]map[rune]bool)
 
-		for s, centroids := range input {
-			chars := []rune(s)
-			charIndex := make(map[rune]int)
-			for i, c := range chars {
-				charIndex[c] = i
+		for _, entry := range stringData {
+			centroids := entry.Centroids
+			runs := entry.Collapsed
+			R := len(runs)
+			L := len(centroids)
+
+			if R > L {
+				fmt.Printf("Warning: Not enough centroids for %s\n", entry.String)
+				continue
 			}
 
-			for i := 0; i < len(centroids); i++ {
-				cent := centroids[i]
-				currentPossible := possibleChars[cent]
-				if len(currentPossible) == 0 {
-					continue
+			minStart := make([]int, R)
+			maxEnd := make([]int, R)
+			for i := 0; i < R; i++ {
+				minStart[i] = i
+				maxEnd[i] = L - 1 - i
+			}
+
+			current := 0
+			for i := 0; i < R; i++ {
+				c := runs[i]
+				for current < L && !possibleChars[centroids[current]][c] {
+					current++
 				}
+				if current >= L {
+					fmt.Printf("Error: No valid start for %c in %s\n", c, entry.String)
+					return
+				}
+				minStart[i] = current
+				current++
+			}
 
-				for c := range currentPossible {
-					cPos, ok := charIndex[c]
-					if !ok {
-						continue // shouldn't happen after first pass
-					}
+			current = L - 1
+			for i := R - 1; i >= 0; i-- {
+				c := runs[i]
+				for current >= 0 && !possibleChars[centroids[current]][c] {
+					current--
+				}
+				if current < 0 {
+					fmt.Printf("Error: No valid end for %c in %s\n", c, entry.String)
+					return
+				}
+				maxEnd[i] = current
+				current--
+			}
 
-					invalid := false
-					// Check all subsequent centroids
-					for j := i + 1; j < len(centroids); j++ {
-						nextCent := centroids[j]
-						nextPossible := possibleChars[nextCent]
-						for d := range nextPossible {
-							dPos := charIndex[d]
-							if dPos < cPos {
-								invalid = true
-								break
-							}
+			for i := 0; i < R; i++ {
+				c := runs[i]
+				for j := minStart[i]; j <= maxEnd[i]; j++ {
+					if (i*L)/R == j {
+						cent := centroids[j]
+						if _, ok := newPossible[cent]; !ok {
+							newPossible[cent] = make(map[rune]bool)
 						}
-						if invalid {
-							break
-						}
-					}
-
-					if invalid {
-						delete(currentPossible, c)
-						changed = true
+						newPossible[cent][c] = true
 					}
 				}
 			}
 		}
-	}
 
-	// Output the results
-	for cent, chars := range possibleChars {
-		if len(chars) == 1 {
-			for c := range chars {
-				fmt.Printf("%d: %c\n", cent, c)
+		for cent := range allCentroids {
+			newSet, ok := newPossible[cent]
+			if !ok {
+				continue
 			}
-		} else if len(chars) > 0 {
-			fmt.Printf("%d: Possible characters: ", cent)
-			for c := range chars {
-				fmt.Printf("%c ", c)
+			currentSet := possibleChars[cent]
+			updatedSet := make(map[rune]bool)
+			for c := range newSet {
+				if currentSet[c] {
+					updatedSet[c] = true
+				}
 			}
-			fmt.Println()
-		} else {
-			fmt.Printf("%d: No possible characters\n", cent)
+			if !equal(updatedSet, currentSet) {
+				possibleChars[cent] = updatedSet
+				changed = true
+			}
 		}
 	}
+
+	out := make(map[string][]uint32)
+	out[""] = hash
+
+	invertedMap := make(map[string][]uint32)
+
+	var centroids []uint32
+	for cent := range possibleChars {
+		centroids = append(centroids, cent)
+	}
+
+	for _, cent := range centroids {
+		chars := possibleChars[cent]
+		var charSlice []string
+		for r := range chars {
+			charSlice = append(charSlice, string(r))
+		}
+		if verbose != nil && *verbose {
+			sort.Strings(charSlice)
+			fmt.Printf("%d: %s\n", cent, strings.Join(charSlice, ", "))
+		}
+		for _, ch := range charSlice {
+			invertedMap[ch] = append(invertedMap[ch], cent)
+		}
+	}
+
+	for ch, cents := range invertedMap {
+		out[ch] = cents
+	}
+
+	outputFile, err := os.Create(*sttFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer outputFile.Close()
+
+	encoder := json.NewEncoder(outputFile)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(out); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func equal(a, b map[rune]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
 }

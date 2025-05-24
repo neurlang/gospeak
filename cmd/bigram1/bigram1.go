@@ -77,10 +77,16 @@ func main() {
 	}
 
 	var sol uint32
-	parallel.Loop(1000).LoopUntil(func(i uint32, _ parallel.LoopStopper) bool {
+	parallel.Loop(1000).LoopUntil(func(i uint32, s parallel.LoopStopper) bool {
+		if s.Load() {
+			return true
+		}
 		var usedLock sync.Mutex
 		var used = make(map[uint32]struct{})
-		parallel.Loop(1000).LoopUntil(func(j uint32, _ parallel.LoopStopper) bool {
+		parallel.Loop(1000).LoopUntil(func(j uint32, s parallel.LoopStopper) bool {
+			if s.Load() {
+				return true
+			}
 			if uint64(j) >= uint64(len(framedata)) {
 				return true
 			}
@@ -107,6 +113,22 @@ func main() {
 		usedLock.Unlock()
 		return false
 	})
+	{
+		var used = make(map[uint32][8]uint32)
+		for _, val := range framedata {
+			var h = sol
+			for k := 0; k < 8; k++ {
+				h = hash.Hash(h, val[k], (1<<32)-1)
+			}
+			if old, ok := used[h]; ok {
+				if old != val {
+					panic("hash conflict")
+				}
+			}
+			println(h)
+			used[h] = val
+		}
+	}
 
 	var odata = make(map[string][]uint32)
 	for j, v := range data {
@@ -124,6 +146,7 @@ func main() {
 		}
 		odata[key] = buffer
 	}
+	odata[""] = []uint32{sol}
 	{
 		// Convert to JSON
 		jsonData, err := json.MarshalIndent(odata, "", "  ")
