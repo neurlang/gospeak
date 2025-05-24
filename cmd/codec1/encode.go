@@ -171,6 +171,9 @@ func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte,
 			minDist := math.MaxFloat64
 			nearestIdx := 0
 			for idx, valueCoords := range centroids[rang] {
+				if len(valueCoords) == 0 {
+					continue
+				}
 				if len(keyCoords) != len(valueCoords) {
 					println(len(keyCoords), len(valueCoords))
 					panic("keyCoords don't match valueCoords")
