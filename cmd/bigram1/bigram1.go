@@ -61,7 +61,7 @@ func main() {
 				continue
 			}
 		}
-		println("No IPA found for file: ", k)
+		println("Warning: No IPA found for file: ", k)
 		delete(data, k)
 	}
 
@@ -113,6 +113,7 @@ func main() {
 		usedLock.Unlock()
 		return false
 	})
+/*
 	{
 		var used = make(map[uint32][8]uint32)
 		for _, val := range framedata {
@@ -129,7 +130,7 @@ func main() {
 			used[h] = val
 		}
 	}
-
+*/
 	var odata = make(map[string][]uint32)
 	for j, v := range data {
 		var buffer []uint32

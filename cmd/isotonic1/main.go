@@ -31,6 +31,7 @@ func main() {
 	inputFile := flag.String("i", "", "Path to input file study.json")
 	sttFile := flag.String("o", "", "Path to output file stt.json")
 	verbose := flag.Bool("v", false, "Verbose output")
+	radius := flag.Int("r", 0, "Radius of IPA presence (higher radius relaxes the forced alignment)")
 	flag.Parse()
 
 	if *inputFile == "" || *sttFile == "" {
@@ -135,7 +136,7 @@ func main() {
 			for i := 0; i < R; i++ {
 				c := runs[i]
 				for j := minStart[i]; j <= maxEnd[i]; j++ {
-					if (i*L)/R == j {
+					if ((i*L)/R)/(2 * *radius + 1) == j/(2 * *radius + 1) {
 						cent := centroids[j]
 						if _, ok := newPossible[cent]; !ok {
 							newPossible[cent] = make(map[rune]bool)
