@@ -10,14 +10,14 @@ func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename 
 	var samplerate int
 	var freqs int
 	switch len(all_centroids[0][0]) / 3 {
-	case 38:
-		freqs = 384 * 2
+	case 384 * 2 * 2:
+		freqs = 384 * 2 * 2
 		samplerate = 48000
-	case 41:
-		freqs = 418 * 2
+	case 418 * 2 * 2:
+		freqs = 418 * 2 * 2
 		samplerate = 44100
 	default:
-		println("freqs:", freqs)
+		println("len:", len(all_centroids[0][0])/3)
 		panic("unsupported sample rate")
 	}
 
@@ -26,14 +26,15 @@ func centroids_vocode(centroids []uint32, all_centroids [][][]float64, filename 
 	m.Window = 640 * 2
 	m.NumFreqs = freqs
 	m.Resolut = 2048 * 2
-	m.VolumeBoost = 4
+
+	const total_rang = 1
 
 	//fmt.Println(centroids)
 
 	var buf [][3]float64
 	var done int
 	for iii, centroid := range centroids {
-		ii := iii % 8
+		ii := iii % total_rang
 		if ii == 0 {
 			buf = append(buf, make([][3]float64, freqs-done, freqs-done)...)
 			done = 0

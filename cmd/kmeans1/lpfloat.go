@@ -1,8 +1,6 @@
 package main
 
 import "fmt"
-import "sync/atomic"
-import "math"
 
 type LPFloat struct {
 	Value  float64 // the actual value
@@ -11,24 +9,12 @@ type LPFloat struct {
 
 func (l LPFloat) MarshalJSON() ([]byte, error) {
 	s := fmt.Sprintf("%.*f", l.Digits, l.Value)
+	for len(s) > 2 {
+		if s[len(s)-1] == '0' && s[len(s)-2] != '.' {
+			s = s[:len(s)-1]
+		} else {
+			break
+		}
+	}
 	return []byte(s), nil
-}
-
-var badFloatDetected atomic.Bool
-
-func verifyFloat(value float64) float64 {
-	if badFloatDetected.Load() {
-		return value
-	}
-	badFloatDetected.Store(true)
-	if math.IsNaN(value) {
-		println("\nbadFloatDetected: NaN")
-	}
-	if math.IsInf(value, 1) {
-		println("\nbadFloatDetected: +Inf")
-	}
-	if math.IsInf(value, -1) {
-		println("\nbadFloatDetected: -Inf")
-	}
-	return value
 }

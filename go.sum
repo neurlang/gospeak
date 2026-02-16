@@ -100,8 +100,8 @@ github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff h1:hhjCS30yF
 github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff/go.mod h1:E4XumjY7XBOZldR64dfPp/H26adyl+HysU3TWWavRbo=
 github.com/neurlang/clusters v0.0.0-20250510123422-80f85025f915 h1:ikp6F8YR/JQM9bp0nCXI1BQMDZV5ETtb2QsH4bIek00=
 github.com/neurlang/clusters v0.0.0-20250510123422-80f85025f915/go.mod h1:YoSYogAOYhfi1aIsA5iwKvQDJ7YU+A64pGKUeNhTG1Y=
-github.com/neurlang/gomel v0.0.6 h1:KIONYW87mb1ozNnR9p+eYLLMiko4JCs1Ad55T2phdjs=
-github.com/neurlang/gomel v0.0.6/go.mod h1:RcyfUJooN5YVC1/yq8gwo1Lg8uvtknQhSLOzD8ixG6M=
+github.com/neurlang/gomel v0.0.8 h1:HxVT+8f8XSVF8MRD47qxMpCZVNlMvxEpzIYDuFPBynQ=
+github.com/neurlang/gomel v0.0.8/go.mod h1:kkVCEyAxkPmsNnzGzdThVz1Bm8cd+wdGxM70KCw7N4Y=
 github.com/neurlang/kmeans v0.0.1 h1:5rP/dS8WiceRqA5rr063/mNBO2e9KB8uAom4ujlJYbk=
 github.com/neurlang/kmeans v0.0.1/go.mod h1:9LsD54cd8wtgCBnNQ9c+7McMcBi3TFyTFVfFNRqWvo4=
 github.com/neurlang/quaternary v0.1.1 h1:9pF/dTDM+KWHuDTlv0AN1RTS30Q3ekys1B0nNRU8f0w=

@@ -174,11 +174,11 @@ func (numFreqs *Stuffer) doZeroStuff(audio []float64, sampleRate uint32, err err
 	}
 	switch sampleRate {
 	case 8000, 16000, 48000:
-		if *numFreqs != 384*2 {
+		if *numFreqs != 384*2*2 {
 			return nil, 0
 		}
 	case 11025, 22050, 44100:
-		if *numFreqs != 418*2 {
+		if *numFreqs != 418*2*2 {
 			return nil, 0
 		}
 	}
@@ -302,7 +302,9 @@ func main() {
 		return
 	}
 
-	const limit = 9999999999999999
+	const limit = 200
+	const digits = 3
+	const total_rang = 1
 
 	// 1. Load FLAC file and convert to phase spectrogram
 	m := phase.NewPhase()
@@ -341,12 +343,12 @@ func main() {
 				switch sr {
 				case 8000, 16000, 48000:
 					println("Codec native sample rate: 48000")
-					m.NumFreqs = 384 * 2
-					ranges = []int{0, 38, 88, 134, 184, 234, 367, 501, 384 * 2}
+					m.NumFreqs = 384 * 2 * 2
+					ranges = []int{0, m.NumFreqs}
 				case 11025, 22050, 44100:
 					println("Codec native sample rate: 44100")
-					m.NumFreqs = 418 * 2
-					ranges = []int{0, 41, 95, 145, 200, 254, 400, 545, 418 * 2}
+					m.NumFreqs = 418 * 2 * 2
+					ranges = []int{0, m.NumFreqs}
 				}
 			}
 			if isFlac {
@@ -389,7 +391,7 @@ func main() {
 		Centroids [][][]LPFloat
 	}
 
-	for rang := 0; rang < 8; rang++ {
+	for rang := 0; rang < total_rang; rang++ {
 		file.Centroids = append(file.Centroids, nil)
 		file.minDists = nil
 		// dataset for master problem
@@ -431,9 +433,9 @@ func main() {
 				for j := 0; j < len(melFrames); j += m.NumFreqs {
 					var keycoords []float64
 					for i := ranges[rang]; i < ranges[rang+1]; i++ {
-						keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
-						keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
-
+						keycoords = append(keycoords, melFrames[j+i][0])
+						keycoords = append(keycoords, melFrames[j+i][1])
+						keycoords = append(keycoords, melFrames[j+i][2])
 					}
 					var coords = clusters.Coordinates(keycoords)
 					dataset_mut.Lock()
@@ -444,15 +446,15 @@ func main() {
 				dataset_total.Add(uint64(len(melFrames)) / uint64(m.NumFreqs))
 				dataset_progress.Add(uint64(chunks))
 				if dataset_progress.Load() > uint64(len(filesFlac)+len(filesWav)) {
-					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "loading")
+					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "loading")
 				} else {
-					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "loading")
+					progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, dataset_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "loading")
 				}
 				//println(discarded)
 			})
-			progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "loading")
+			progressbar(2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "loading")
 			if execute != nil && *execute != "" {
-				command(*execute, 2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "loading")
+				command(*execute, 2*chunk+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, false, executedbg != nil && *executedbg, 96, "loading")
 			}
 
 			fmt.Println()
@@ -468,11 +470,11 @@ func main() {
 
 			ShuffleSlice(dataset)
 
-			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "kmeans")
+			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 0, 1, "kmeans")
 
 			plotter := &plotter{
 				stage:        2*chunk + 2 + (2*chunks+2)*rang,
-				stages:       (2*chunks + 2) * 8,
+				stages:       (2*chunks + 2) * total_rang,
 				del:          0.05,
 				execString:   execString,
 				executedbg:   execdbg,
@@ -495,20 +497,20 @@ func main() {
 			for _, c := range clu {
 				master = append(master, c.Center)
 			}
-			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "kmeans")
+			progressbar(2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "kmeans")
 			if execute != nil && *execute != "" {
-				command(*execute, 2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "kmeans")
+				command(*execute, 2*chunk+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, false, executedbg != nil && *executedbg, 96, "kmeans")
 			}
 		}
 
 		ShuffleSlice(master)
-		progressbar(2*chunks+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "kmeans")
+		progressbar(2*chunks+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "kmeans")
 		fmt.Println()
-		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "final")
+		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 0, 1, "final")
 
 		plotter := &plotter{
 			stage:        2*chunks + 1 + (2*chunks+2)*rang,
-			stages:       (2*chunks + 2) * 8,
+			stages:       (2*chunks + 2) * total_rang,
 			del:          0.05,
 			execString:   execString,
 			executedbg:   execdbg,
@@ -540,12 +542,12 @@ func main() {
 
 		// 6. convert wavs to codewords
 		var final_dump_progress atomic.Uint64
-		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "final")
+		progressbar(2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "final")
 		if execute != nil && *execute != "" {
-			command(*execute, 2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*8, false, executedbg != nil && *executedbg, 96, "final")
+			command(*execute, 2*chunks+1+(2*chunks+2)*rang, (2*chunks+2)*total_rang, false, executedbg != nil && *executedbg, 96, "final")
 		}
 		fmt.Println()
-		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 0, 1, "dumping")
+		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 0, 1, "dumping")
 
 		parallel.ForEach(len(filesFlac)+len(filesWav), *threads, func(i int) {
 
@@ -573,14 +575,15 @@ func main() {
 				// Convert [m.NumFreqs][3]float64 to a flat []float64 (1152 dimensions)
 				var coords []LPFloat
 				for i := ranges[rang]; i < ranges[rang+1]; i++ {
-					coords = append(coords, LPFloat{Value: melFrames[j+i][0], Digits: 3}) // first component
-					coords = append(coords, LPFloat{Value: melFrames[j+i][1], Digits: 3}) // second component
-					coords = append(coords, LPFloat{Value: melFrames[j+i][2], Digits: 3}) // third component
+					coords = append(coords, LPFloat{Value: melFrames[j+i][0], Digits: digits}) // first component
+					coords = append(coords, LPFloat{Value: melFrames[j+i][1], Digits: digits}) // second component
+					coords = append(coords, LPFloat{Value: melFrames[j+i][2], Digits: digits}) // third component
 				}
 				var keycoords []float64
 				for i := ranges[rang]; i < ranges[rang+1]; i++ {
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][2])), 2))))
-					keycoords = append(keycoords, (math.Sqrt(math.Pow(verifyFloat(math.Exp2(melFrames[j+i][0])), 2) + math.Pow(verifyFloat(math.Exp2(melFrames[j+i][1])), 2))))
+					keycoords = append(keycoords, melFrames[j+i][0])
+					keycoords = append(keycoords, melFrames[j+i][1])
+					keycoords = append(keycoords, melFrames[j+i][2])
 				}
 				var sample = clusters.Coordinates(keycoords)
 				for codeword := range clu {
@@ -595,10 +598,10 @@ func main() {
 					fileMutex.Unlock()
 				}
 			}
-			progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "dumping")
+			progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, final_dump_progress.Load(), uint64(len(filesFlac)+len(filesWav)), "dumping")
 			final_dump_progress.Add(1)
 		})
-		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*8, 1, 1, "dumping")
+		progressbar(2*chunks+2+(2*chunks+2)*rang, (2*chunks+2)*total_rang, 1, 1, "dumping")
 		fmt.Println()
 		// Output to file
 		{
@@ -619,6 +622,6 @@ func main() {
 	}
 	fmt.Println("Codec solved: true")
 	if execute != nil && *execute != "" {
-		command(*execute, (2*chunks+2)*8, (2*chunks+2)*8, true, executedbg != nil && *executedbg, 96, "completed")
+		command(*execute, (2*chunks+2)*total_rang, (2*chunks+2)*total_rang, true, executedbg != nil && *executedbg, 96, "completed")
 	}
 }

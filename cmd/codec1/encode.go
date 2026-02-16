@@ -18,11 +18,11 @@ func (numFreqs *Stuffer) doZeroStuff(audio []float64, sampleRate uint32, err err
 	}
 	switch sampleRate {
 	case 8000, 16000, 48000:
-		if *numFreqs != 384*2 {
+		if *numFreqs != 384*2*2 {
 			return nil, 0
 		}
 	case 11025, 22050, 44100:
-		if *numFreqs != 418*2 {
+		if *numFreqs != 418*2*2 {
 			return nil, 0
 		}
 	}
@@ -81,9 +81,7 @@ func centroids_load(centroidsFile string) [][][]float64 {
 				c0 := centroid[3*i]
 				c1 := centroid[3*i+1]
 				c2 := centroid[3*i+2]
-				val1 := math.Sqrt(math.Pow(math.Exp2(c1), 2) + math.Pow(math.Exp2(c2), 2))
-				val2 := math.Sqrt(math.Pow(math.Exp2(c0), 2) + math.Pow(math.Exp2(c1), 2))
-				valueCoords = append(valueCoords, val1, val2)
+				valueCoords = append(valueCoords, c0, c1, c2)
 			}
 			precomputedCentroidValueCoords[rang][idx] = valueCoords
 		}
@@ -115,17 +113,16 @@ func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte,
 	m.YReverse = true
 	m.Window = 640 * 2
 	m.Resolut = 2048 * 2
-	m.VolumeBoost = 4
 	var ranges []int
 
 	// Determine frequency bands based on sample rate
 	switch sampleRate {
 	case 11025, 22050, 44100:
-		m.NumFreqs = 418 * 2
-		ranges = []int{0, 41, 95, 145, 200, 254, 400, 545, 418 * 2}
+		m.NumFreqs = 418 * 2 * 2
+		ranges = []int{0, m.NumFreqs}
 	case 8000, 16000, 48000:
-		m.NumFreqs = 384 * 2
-		ranges = []int{0, 38, 88, 134, 184, 234, 367, 501, 384 * 2}
+		m.NumFreqs = 384 * 2 * 2
+		ranges = []int{0, m.NumFreqs}
 	default:
 		return nil, fmt.Errorf("Unsupported sample rate")
 	}
@@ -139,18 +136,18 @@ func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte,
 	}
 
 	audio = nil
-
+	const total_rang = 1
 	//println(len(melFrames))
 
 	// Find nearest centroids for each frame
 	frameSize := m.NumFreqs
-	var indices = make([]uint64, 8*len(melFrames)/frameSize, 8*len(melFrames)/frameSize)
+	var indices = make([]uint64, total_rang*len(melFrames)/frameSize, total_rang*len(melFrames)/frameSize)
 	parallel.ForEach(len(melFrames)/frameSize, 100, func(jj int) {
 		j := jj * frameSize
 		if j+frameSize > len(melFrames) {
 			return
 		}
-		for rang := 0; rang < 8; rang++ {
+		for rang := 0; rang < total_rang; rang++ {
 			if len(centroids) <= rang {
 				break
 			}
@@ -161,10 +158,7 @@ func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte,
 			// Calculate key coordinates for current frame
 			var keyCoords []float64
 			for i := ranges[rang]; i < ranges[rang+1]; i++ {
-				frame := melFrames[j+i]
-				val1 := math.Sqrt(math.Pow(math.Exp2(frame[1]), 2) + math.Pow(math.Exp2(frame[2]), 2))
-				val2 := math.Sqrt(math.Pow(math.Exp2(frame[0]), 2) + math.Pow(math.Exp2(frame[1]), 2))
-				keyCoords = append(keyCoords, val1, val2)
+				keyCoords = append(keyCoords, melFrames[j+i][0], melFrames[j+i][1], melFrames[j+i][2])
 			}
 
 			// Find closest centroid using precomputed valueCoords
@@ -189,7 +183,7 @@ func centroids_unvocode(inputFile string, centroids [][][]float64) (data []byte,
 					nearestIdx = idx
 				}
 			}
-			indices[8*jj+rang] = uint64(nearestIdx)
+			indices[total_rang*jj+rang] = uint64(nearestIdx)
 		}
 	})
 

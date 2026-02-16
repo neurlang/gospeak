@@ -5,9 +5,8 @@ go 1.18
 require (
 	github.com/neurlang/classifier v0.1.9-0.20250502142752-3f32ac9e1bff
 	github.com/neurlang/clusters v0.0.0-20250510123422-80f85025f915
-	github.com/neurlang/gomel v0.0.6
+	github.com/neurlang/gomel v0.0.8
 	github.com/neurlang/kmeans v0.0.1
-
 )
 
 require (

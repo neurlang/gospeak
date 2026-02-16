@@ -62,7 +62,7 @@ func handleHelp() {
 }
 
 func handleDecode() {
-	start := time.Now()
+
 	cmd := flag.NewFlagSet("decode", flag.ExitOnError)
 	inputFile := cmd.String("i", "", "Input JSON file path")
 	rawFile := cmd.String("r", "", "Raw JSON or comma separated sequence of integers")
@@ -78,17 +78,27 @@ func handleDecode() {
 	}
 
 	// Read input tokens
-	var tokens []uint64
+	var allTokens = make(map[string][]uint32)
 	if inputFile != nil && *inputFile != "" {
 		data, err := os.ReadFile(*inputFile)
 		if err != nil {
 			panic(fmt.Sprintf("Error reading input file: %v", err))
 		}
 
-		if err := json.Unmarshal(data, &tokens); err != nil {
-			panic(fmt.Sprintf("Error parsing JSON: %v", err))
+		if data[0] == '[' {
+			var tokens []uint32
+			if err := json.Unmarshal(data, &tokens); err != nil {
+				panic(fmt.Sprintf("Error parsing JSON: %v", err))
+			}
+			allTokens[""] = tokens
+		} else {
+			if err := json.Unmarshal(data, &allTokens); err != nil {
+				panic(fmt.Sprintf("Error parsing JSON: %v", err))
+			}
 		}
+
 	} else {
+		var tokens []uint32
 		var vector = strings.Trim(*rawFile, "[] ")
 		vector = strings.ReplaceAll(vector, " ", ",")
 		for strings.Contains(vector, ",,") {
@@ -97,13 +107,7 @@ func handleDecode() {
 		if err := json.Unmarshal([]byte("["+vector+"]"), &tokens); err != nil {
 			panic(fmt.Sprintf("Error parsing JSON: %v", err))
 		}
-		fmt.Println(tokens)
-	}
-
-	// Convert to uint32 slice
-	var tokens32 []uint32
-	for _, t := range tokens {
-		tokens32 = append(tokens32, uint32(t))
+		allTokens[""] = tokens
 	}
 
 	// Load centroids
@@ -117,9 +121,14 @@ func handleDecode() {
 		panic(fmt.Sprintf("Error parsing centroids JSON: %v", err))
 	}
 
-	// Generate audio
-	centroids_vocode(tokens32, centroids.Centroids, *outputFile)
-	fmt.Printf("Decoding completed in %v\n", time.Since(start))
+	for k, tokens32 := range allTokens {
+		start := time.Now()
+
+		// Generate audio
+		centroids_vocode(tokens32, centroids.Centroids, *outputFile+k)
+		fmt.Printf("Decoding completed in %v\n", time.Since(start))
+
+	}
 }
 
 func isDirectory(path string) (bool, error) {
